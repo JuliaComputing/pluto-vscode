@@ -1,5 +1,13 @@
 # pluto-vscode
-Pluto inside a VS Code Webview, WIP
+Pluto inside a VS Code Webview, WIP.
+
+This extension will automatically:
+- Launch the Pluto server for you
+- Proxy Pluto's assets through VS Code
+- Proxy the websocket connection through VS Code
+- (TODO) Detect Pluto files and offer to run them
+
+Proxying the communication through VS Code means that this extension works inside Remote SSH, GitHub Codespaces & JuliaHub. (not yet tested)
 
 https://user-images.githubusercontent.com/6933510/134571646-cca5239a-1edf-48ab-b2a2-7828df79c002.mov
 
