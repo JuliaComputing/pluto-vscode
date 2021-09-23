@@ -1,6 +1,8 @@
 # pluto-vscode
 Pluto inside a VS Code Webview, WIP
 
+https://user-images.githubusercontent.com/6933510/134571646-cca5239a-1edf-48ab-b2a2-7828df79c002.mov
+
 Instructions:
 1. Install Julia (1.5 - 1.7) and make sure the `julia` shell command launches it.
 2. Install the `vscode-webview-proxy` branch of Pluto, either using git and `pkg> dev folder/to/Pluto.jl` or `pkg> add Pluto#vscode-webview-proxy`.
