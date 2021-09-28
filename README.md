@@ -1,5 +1,5 @@
 # pluto-vscode
-Pluto inside a VS Code Webview, WIP.
+Pluto inside a VS Code Webview, WIP. **You currently need some nodejs/npm skills to be able to run this, we don't ship a prebuilt extension yet.**
 
 This extension will automatically:
 - Launch the Pluto server for you
