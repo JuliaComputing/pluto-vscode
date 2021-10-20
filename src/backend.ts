@@ -8,6 +8,8 @@ import _ from "lodash"
 type BackendOpts = {
     pluto_asset_dir: string
     vscode_proxy_root: vscode.Uri
+    frontend_params?: Object
+    pluto_config?: Object
 }
 
 const get_julia_command = async (): Promise<string> => {
@@ -67,7 +69,14 @@ export class PlutoBackend {
 
         // hack to let me write async code inside the constructor
         Promise.resolve().then(async () => {
-            const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(await this.port), this.secret]
+            const args = [
+                opts.pluto_asset_dir,
+                String(opts.vscode_proxy_root),
+                String(await this.port),
+                this.secret,
+                JSON.stringify(opts.pluto_config ?? {}),
+                JSON.stringify(opts.frontend_params ?? {}),
+            ]
 
             const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })

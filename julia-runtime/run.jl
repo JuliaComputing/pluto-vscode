@@ -1,9 +1,9 @@
 ####
 @info "COMMAND LINE ARGUMENTS"
 
-asset_output_dir, vscode_proxy_root_raw, port_str, secret = if isempty(ARGS)
+asset_output_dir, vscode_proxy_root_raw, port_str, secret, pluto_launch_params, frontend_params = if isempty(ARGS)
 	@warn "No arguments given, using development defaults!"
-	mktempdir(cleanup=false), "", "4653", "asdf"
+	mktempdir(cleanup=false), "", "4653", "asdf", "{}", "{}"
 else
 	ARGS
 end
@@ -20,11 +20,13 @@ end
 ####
 @info "PLUTO SETUP"
 
+import JSON
 import Pluto
 
 pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
 	port=port,
 	launch_browser=false,
+	(Symbol(k) => v for (k, v) in JSON.parse(pluto_launch_params))...,
 	
 )
 pluto_server_session = Pluto.ServerSession(;
@@ -50,6 +52,7 @@ function generate_output()
 		binder_url_js = "undefined",
 		notebook_id_js = repr(string(nb.notebook_id)),
 		disable_ui = false,
+		(Symbol(k) => v for (k, v) in JSON.parse(frontend_params))...,
 	)
 	cp(Pluto.project_relative_path("frontend"), asset_output_dir; force=true)
 	write(joinpath(asset_output_dir, "editor_bespoke.html"), new_editor_contents)

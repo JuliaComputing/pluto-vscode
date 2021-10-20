@@ -86,9 +86,15 @@ class PlutoPanel {
         statusBarItem.text = "Pluto"
         statusBarItem.command = "catalystgui.showOptions"
         statusBarItem.show()
-        const pb = PlutoBackend.create(context, statusBarItem, {
+        const backend = PlutoBackend.create(context, statusBarItem, {
             pluto_asset_dir,
             vscode_proxy_root: panel.webview.asWebviewUri(vscode.Uri.file(pluto_asset_dir)),
+            frontend_params: {
+                // disable_ui: true,
+            },
+            pluto_config: {
+                // workspace_use_distributed: false,
+            },
         })
 
         const handler = setInterval(() => {
@@ -103,7 +109,7 @@ class PlutoPanel {
 
                     console.log("Creating proxy...")
                     await create_proxy({
-                        ws_address: `ws://localhost:${await pb.port}/?secret=${pb.secret}`,
+                        ws_address: `ws://localhost:${await backend.port}/?secret=${backend.secret}`,
                         send_to_client: (x: any) => panel.webview.postMessage(x),
                         create_client_listener: (f: any) => {
                             panel.webview.onDidReceiveMessage(f, null, current._disposables)
