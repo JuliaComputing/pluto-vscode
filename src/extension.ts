@@ -3,6 +3,7 @@ import { PlutoBackend as PlutoBackend } from "./backend"
 import { accessSync, readFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
+import { v4 as uuid } from "uuid"
 import { create_proxy } from "./ws-proxy"
 
 export function activate(context: vscode.ExtensionContext) {
@@ -58,11 +59,6 @@ class PlutoPanel {
     public static createOrShow(context: vscode.ExtensionContext) {
         console.info("Launching Pluto panel!")
 
-        const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
-
-        const pluto_asset_dir = join(tmpdir(), getNonce())
-        console.log("pluto_asset_dir: ", pluto_asset_dir)
-
         const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined
 
         // If we already have a panel, show it.
@@ -70,6 +66,11 @@ class PlutoPanel {
             PlutoPanel.currentPanel._panel.reveal(column)
             return
         }
+
+        const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
+
+        const pluto_asset_dir = join(tmpdir(), getNonce())
+        console.log("pluto_asset_dir: ", pluto_asset_dir)
 
         // Otherwise, create a new panel.
         const panel = vscode.window.createWebviewPanel(
@@ -89,49 +90,60 @@ class PlutoPanel {
         const backend = PlutoBackend.create(context, statusBarItem, {
             pluto_asset_dir,
             vscode_proxy_root: panel.webview.asWebviewUri(vscode.Uri.file(pluto_asset_dir)),
-            frontend_params: {
-                // disable_ui: true,
-            },
             pluto_config: {
                 // workspace_use_distributed: false,
             },
         })
 
-        const handler = setInterval(() => {
-            try {
-                accessSync(join(pluto_asset_dir, "editor_bespoke.html"))
-                console.log("file exists!")
+        backend.ready.then(async () => {
+            const editor_html_filename = `editor_bespoke_${uuid()}.html`
+            await backend.send_command("new", {
+                editor_html_filename,
+                frontend_params: {
+                    // disable_ui: true,
+                },
+            })
 
-                setTimeout(async () => {
-                    const contents = readFileSync(join(pluto_asset_dir, "editor_bespoke.html"), {
-                        encoding: "utf8",
-                    })
+            const handler = setInterval(() => {
+                try {
+                    accessSync(join(pluto_asset_dir, editor_html_filename))
+                    console.log("file exists!")
 
-                    console.log("Creating proxy...")
-                    await create_proxy({
-                        ws_address: `ws://localhost:${await backend.port}/?secret=${backend.secret}`,
-                        send_to_client: (x: any) => panel.webview.postMessage(x),
-                        create_client_listener: (f: any) => {
-                            panel.webview.onDidReceiveMessage(f, null, current._disposables)
-                        },
-                        alert: (x: string) => {
-                            return vscode.window.showInformationMessage(x, { modal: true })
-                        },
-                        confirm: (x: string) => {
-                            return vscode.window.showInformationMessage(x, { modal: true }, ...["Yes", "No"]).then((answer) => answer === "Yes")
-                        },
-                    })
-                    console.log("Proxy created!")
+                    setTimeout(async () => {
+                        const contents = readFileSync(join(pluto_asset_dir, editor_html_filename), {
+                            encoding: "utf8",
+                        })
 
-                    console.log("Loading page HTML")
-                    current.set_html("Pluto", contents)
-                }, 50)
+                        console.log("Creating proxy...")
+                        await create_proxy({
+                            ws_address: `ws://localhost:${await backend.port}/?secret=${backend.secret}`,
+                            send_to_client: (x: any) => {
+                                if (PlutoPanel.currentPanel?._panel === panel) {
+                                    return panel.webview.postMessage(x)
+                                }
+                            },
+                            create_client_listener: (f: any) => {
+                                panel.webview.onDidReceiveMessage(f, null, current._disposables)
+                            },
+                            alert: (x: string) => {
+                                return vscode.window.showInformationMessage(x, { modal: true })
+                            },
+                            confirm: (x: string) => {
+                                return vscode.window.showInformationMessage(x, { modal: true }, ...["Yes", "No"]).then((answer) => answer === "Yes")
+                            },
+                        })
+                        console.log("Proxy created!")
 
-                clearInterval(handler)
-            } catch (e) {
-                //
-            }
-        }, 200)
+                        console.log("Loading page HTML")
+                        current.set_html("Pluto", contents)
+                    }, 50)
+
+                    clearInterval(handler)
+                } catch (e) {
+                    //
+                }
+            }, 200)
+        })
     }
 
     public static revive(panel: vscode.WebviewPanel, context: vscode.ExtensionContext) {
@@ -162,6 +174,7 @@ class PlutoPanel {
     }
 
     public dispose() {
+        console.log("disposing!")
         PlutoPanel.currentPanel = undefined
 
         // Clean up our resources

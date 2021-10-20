@@ -8,7 +8,6 @@ import _ from "lodash"
 type BackendOpts = {
     pluto_asset_dir: string
     vscode_proxy_root: vscode.Uri
-    frontend_params?: Object
     pluto_config?: Object
 }
 
@@ -20,7 +19,7 @@ const get_julia_command = async (): Promise<string> => {
             console.error("Not compatible with this version of the julia extension :(")
         }
         try {
-            let result = await julia_extension.exports.getJuliaExecutable().getCommand()
+            let result = await julia_extension.exports.getJuliaPath()
             console.warn({ result })
             return result
         } catch (e) {
@@ -50,11 +49,22 @@ export class PlutoBackend {
         return !!PlutoBackend._instance
     }
 
+    public send_command(type: string, detail: Object = {}) {
+        this._process!.stdin!.write(
+            JSON.stringify({
+                type,
+                detail,
+            }) + "\0"
+        )
+    }
+
     private _status: vscode.StatusBarItem
     private _process?: cp.ChildProcess
 
     public port: Promise<number>
     public secret: string
+
+    public ready: Promise<boolean>
 
     private constructor(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
         this._status = status
@@ -67,16 +77,13 @@ export class PlutoBackend {
         // find a free port, some random sampling to make collisions less likely
         this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23047)
 
+        let resolve_ready = (x: boolean) => {}
+        this.ready = new Promise<boolean>((r) => {
+            resolve_ready = r
+        })
         // hack to let me write async code inside the constructor
         Promise.resolve().then(async () => {
-            const args = [
-                opts.pluto_asset_dir,
-                String(opts.vscode_proxy_root),
-                String(await this.port),
-                this.secret,
-                JSON.stringify(opts.pluto_config ?? {}),
-                JSON.stringify(opts.frontend_params ?? {}),
-            ]
+            const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {})]
 
             const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })
@@ -89,17 +96,20 @@ export class PlutoBackend {
                 this._status.text = "Pluto: stopped"
                 this._status.show()
             })
-            this._process!.stdout!.on("data", (data) => {
+            this._process.stdout!.on("data", (data) => {
                 console.log(`📄${data.slice(0, data.length - 1)}`)
+                console.log(JSON.parse(data.slice(0, data.length - 1)))
             })
-            this._process!.stderr!.on("data", (data) => {
-                console.log(`📈${data.slice(0, data.length - 1)}`)
+            this._process.stderr!.on("data", (data) => {
+                const text = data.slice(0, data.length - 1)
+                console.log(`📈${text}`)
 
                 // @info prints to stderr
-                // First message includes port
-
-                this._status.text = "Pluto: active"
-                this._status.show()
+                if (text.includes("READY FOR COMMANDS")) {
+                    resolve_ready(true)
+                    this._status.text = "Pluto: active"
+                    this._status.show()
+                }
             })
         })
     }
