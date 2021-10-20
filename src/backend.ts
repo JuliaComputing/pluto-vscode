@@ -20,9 +20,9 @@ const get_julia_command = async (): Promise<string> => {
         try {
             let result = await julia_extension.exports.getJuliaExecutable().getCommand()
             console.warn({ result })
-            return result.getCommand()
+            return result
         } catch (e) {
-            console.error("Failed to get Julia launch command from Julia extension :(")
+            console.error("Failed to get Julia launch command from Julia extension :(", e)
         }
     }
     console.error("Fallback: using `julia` command to launch julia.")
