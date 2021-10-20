@@ -31,6 +31,9 @@ import Pluto
 pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
 	port=port,
 	launch_browser=false,
+	# show_file_system=false,
+	dismiss_update_notification=true,
+	auto_reload_from_file=true,
 	(Symbol(k) => v for (k, v) in JSON.parse(pluto_launch_params))...,
 	
 )

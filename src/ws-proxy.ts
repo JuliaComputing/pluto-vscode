@@ -16,8 +16,9 @@ export const create_proxy = ({
 }) => {
     return new Promise<void>((resolve) => {
         const on_unrequested_update = async (update: Uint8Array) => {
-            console.info("PROXY message from JULIA", update)
-            await send_to_client({ type: "ws_proxy", base64_encoded: await base64_arraybuffer(update) })
+            const to_send = { type: "ws_proxy", base64_encoded: await base64_arraybuffer(update) }
+            console.info("PROXY message from JULIA", to_send)
+            await send_to_client(to_send)
         }
         const on_reconnect = () => {
             return true
@@ -39,7 +40,6 @@ export const create_proxy = ({
                 if (message.type === "ws_proxy") {
                     console.info("PROXY message from CLIENT", message)
                     const data = await decode_base64_to_Uint8Array(message.base64_encoded)
-                    console.log("data: ", data)
                     connection.send(data)
                 } else if (message.type === "alert") {
                     alert(message.text).then(() => {
