@@ -1,9 +1,8 @@
 import * as vscode from "vscode"
 import { PlutoBackend as PlutoBackend } from "./backend"
-import { accessSync, mkdir, mkdtemp, mkdtempSync, readFileSync } from "fs"
+import { accessSync, readFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { base64_arraybuffer, decode_base64_to_Uint8Array } from "./encoding"
 import { create_proxy } from "./ws-proxy"
 
 export function activate(context: vscode.ExtensionContext) {
@@ -84,7 +83,7 @@ class PlutoPanel {
 
         // launch the pluto server
 
-        statusBarItem.text = "Catalyst"
+        statusBarItem.text = "Pluto"
         statusBarItem.command = "catalystgui.showOptions"
         statusBarItem.show()
         const pb = PlutoBackend.create(context, statusBarItem, {

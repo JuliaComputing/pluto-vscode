@@ -25,11 +25,16 @@ import Pluto
 pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
 	port=port,
 	launch_browser=false,
+	
 )
 pluto_server_session = Pluto.ServerSession(;
 	secret=secret,
 	options=pluto_server_options,
 )
+
+
+###
+@info "OPEN NOTEBOOK"
 
 nb = Pluto.SessionActions.new(pluto_server_session)
 

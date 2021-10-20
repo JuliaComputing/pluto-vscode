@@ -1,7 +1,6 @@
 import * as vscode from "vscode"
 import * as cp from "child_process"
 import * as path from "path"
-import * as fs from "fs"
 import { v4 as uuid } from "uuid"
 import portastic from "portastic"
 import _ from "lodash"
@@ -58,9 +57,9 @@ export class PlutoBackend {
     private constructor(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
         this._status = status
 
-        console.log("Starting CatalystBackend...")
+        console.log("Starting PlutoBackend...")
 
-        this._status.text = "Catalyst: starting..."
+        this._status.text = "Pluto: starting..."
         this._status.show()
         this.secret = uuid()
         // find a free port, some random sampling to make collisions less likely
@@ -77,8 +76,8 @@ export class PlutoBackend {
             })
 
             this._process.on("exit", (code) => {
-                console.log(`CatalystBackend exited with code ${code}`)
-                this._status.text = "Catalyst: stopped"
+                console.log(`PlutoBackend exited with code ${code}`)
+                this._status.text = "Pluto: stopped"
                 this._status.show()
             })
             this._process!.stdout!.on("data", (data) => {
@@ -90,7 +89,7 @@ export class PlutoBackend {
                 // @info prints to stderr
                 // First message includes port
 
-                this._status.text = "Catalyst: active"
+                this._status.text = "Pluto: active"
                 this._status.show()
             })
         })
@@ -101,16 +100,7 @@ export class PlutoBackend {
         this._process?.kill()
         PlutoBackend._instance = null
 
-        this._status.text = "Catalyst: killing..."
+        this._status.text = "Pluto: killing..."
         this._status.show()
     }
-}
-
-function getNonce() {
-    let text = ""
-    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length))
-    }
-    return text
 }
