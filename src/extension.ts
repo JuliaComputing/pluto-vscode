@@ -104,7 +104,7 @@ class PlutoPanel {
 
                     console.log("Creating proxy...")
                     await create_proxy({
-                        ws_address: `ws://localhost:${pb.port}/?secret=${pb.secret}`,
+                        ws_address: `ws://localhost:${await pb.port}/?secret=${pb.secret}`,
                         send_to_client: (x: any) => panel.webview.postMessage(x),
                         create_client_listener: (f: any) => {
                             panel.webview.onDidReceiveMessage(f, null, current._disposables)

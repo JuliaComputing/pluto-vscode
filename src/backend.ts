@@ -2,6 +2,9 @@ import * as vscode from "vscode"
 import * as cp from "child_process"
 import * as path from "path"
 import * as fs from "fs"
+import { v4 as uuid } from "uuid"
+import portastic from "portastic"
+import _ from "lodash"
 
 type BackendOpts = {
     pluto_asset_dir: string
@@ -49,7 +52,7 @@ export class PlutoBackend {
     private _status: vscode.StatusBarItem
     private _process?: cp.ChildProcess
 
-    public port: number
+    public port: Promise<number>
     public secret: string
 
     private constructor(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
@@ -59,13 +62,15 @@ export class PlutoBackend {
 
         this._status.text = "Catalyst: starting..."
         this._status.show()
+        this.secret = uuid()
+        // find a free port, some random sampling to make collisions less likely
+        this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23047)
 
-        this.port = 5642
-        this.secret = "TODO"
+        // hack to let me write async code inside the constructor
+        Promise.resolve().then(async () => {
+            const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(await this.port), this.secret]
 
-        const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(this.port), this.secret]
-
-        get_julia_command().then((julia_cmd) => {
+            const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })
             this._process = cp.spawn(julia_cmd, ["--project=.", "run.jl", ...args], {
                 cwd: path.join(context.extensionPath, "julia-runtime"),
