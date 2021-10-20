@@ -27,3 +27,8 @@ Inside the VS Code editor that launched:
 
 8. `Cmd+Shift+P` and run `Pluto: Start new notebook`
 8. While waiting (max 60 seconds), `Cmd+Shift+P` and run `Developer: Open WebView Developer Tools`
+
+To generate the `.vsix` file:
+1. Install `vsce`
+1. `npm install --include=dev`
+1. `vsce package`

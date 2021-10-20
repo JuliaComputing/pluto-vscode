@@ -57,6 +57,8 @@ class PlutoPanel {
     public _disposables: vscode.Disposable[] = []
 
     public static createOrShow(context: vscode.ExtensionContext) {
+        console.info("Launching Pluto panel!")
+
         const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 
         const pluto_asset_dir = join(tmpdir(), getNonce())
