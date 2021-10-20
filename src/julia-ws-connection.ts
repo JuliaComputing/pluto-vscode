@@ -42,7 +42,7 @@ export const timeout_promise = (promise: Promise<any>, time_ms: number): Promise
 const retry_until_resolved = (f: Function, time_ms: number): Promise<any> =>
     timeout_promise(f(), time_ms).catch((e) => {
         console.error(e)
-        console.error("godverdomme")
+        console.error("try failed... trying again")
         return retry_until_resolved(f, time_ms)
     })
 

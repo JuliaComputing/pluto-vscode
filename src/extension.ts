@@ -109,6 +109,12 @@ class PlutoPanel {
                         create_client_listener: (f: any) => {
                             panel.webview.onDidReceiveMessage(f, null, current._disposables)
                         },
+                        alert: (x: string) => {
+                            return vscode.window.showInformationMessage(x, { modal: true })
+                        },
+                        confirm: (x: string) => {
+                            return vscode.window.showInformationMessage(x, { modal: true }, ...["Yes", "No"]).then((answer) => answer === "Yes")
+                        },
                     })
                     console.log("Proxy created!")
 
