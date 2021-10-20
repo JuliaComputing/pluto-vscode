@@ -7,7 +7,8 @@ This extension will automatically:
 - Proxy the websocket connection through VS Code
 - (TODO) Detect Pluto files and offer to run them
 
-Proxying the communication through VS Code means that this extension works inside Remote SSH, GitHub Codespaces & JuliaHub. (not yet tested)
+Proxying the communication through VS Code means that this extension works inside Remote SSH, GitHub Codespaces & JuliaHub. ([tested and it works!](https://user-images.githubusercontent.com/6933510/138145177-f06e5d47-718d-4796-b0f7-b2c2b60224b7.png))
+
 
 https://user-images.githubusercontent.com/6933510/134571646-cca5239a-1edf-48ab-b2a2-7828df79c002.mov
 
