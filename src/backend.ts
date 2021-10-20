@@ -8,6 +8,25 @@ type BackendOpts = {
     vscode_proxy_root: vscode.Uri
 }
 
+const get_julia_command = async (): Promise<string> => {
+    const julia_extension = vscode.extensions.getExtension("julialang.language-julia")
+
+    if (julia_extension) {
+        if (![3, 4].includes(julia_extension.exports.version)) {
+            console.error("Not compatible with this version of the julia extension :(")
+        }
+        try {
+            let result = await julia_extension.exports.getJuliaExecutable().getCommand()
+            console.warn({ result })
+            return result.getCommand()
+        } catch (e) {
+            console.error("Failed to get Julia launch command from Julia extension :(")
+        }
+    }
+    console.error("Fallback: using `julia` command to launch julia.")
+    return "julia"
+}
+
 export class PlutoBackend {
     private static _instance: PlutoBackend | null = null
     public static create(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
@@ -28,7 +47,7 @@ export class PlutoBackend {
     }
 
     private _status: vscode.StatusBarItem
-    private _process: cp.ChildProcess
+    private _process?: cp.ChildProcess
 
     public port: number
     public secret: string
@@ -46,32 +65,35 @@ export class PlutoBackend {
 
         const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(this.port), this.secret]
 
-        this._process = cp.spawn("julia", ["--project=.", "run.jl", ...args], {
-            cwd: path.join(context.extensionPath, "julia-runtime"),
-        })
+        get_julia_command().then((julia_cmd) => {
+            console.log({ julia_cmd })
+            this._process = cp.spawn(julia_cmd, ["--project=.", "run.jl", ...args], {
+                cwd: path.join(context.extensionPath, "julia-runtime"),
+            })
 
-        this._process.on("exit", (code) => {
-            console.log(`CatalystBackend exited with code ${code}`)
-            this._status.text = "Catalyst: stopped"
-            this._status.show()
-        })
-        this._process!.stdout!.on("data", (data) => {
-            console.log(`📄${data.slice(0, data.length - 1)}`)
-        })
-        this._process!.stderr!.on("data", (data) => {
-            console.log(`📈${data.slice(0, data.length - 1)}`)
+            this._process.on("exit", (code) => {
+                console.log(`CatalystBackend exited with code ${code}`)
+                this._status.text = "Catalyst: stopped"
+                this._status.show()
+            })
+            this._process!.stdout!.on("data", (data) => {
+                console.log(`📄${data.slice(0, data.length - 1)}`)
+            })
+            this._process!.stderr!.on("data", (data) => {
+                console.log(`📈${data.slice(0, data.length - 1)}`)
 
-            // @info prints to stderr
-            // First message includes port
+                // @info prints to stderr
+                // First message includes port
 
-            this._status.text = "Catalyst: active"
-            this._status.show()
+                this._status.text = "Catalyst: active"
+                this._status.show()
+            })
         })
     }
 
     public destroy() {
         this._status.hide()
-        this._process.kill()
+        this._process?.kill()
         PlutoBackend._instance = null
 
         this._status.text = "Catalyst: killing..."

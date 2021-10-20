@@ -47,5 +47,8 @@
         "@types/ws": "^7.4.7",
         "utf-8-validate": "^5.0.7",
         "ws": "^8.2.2"
-    }
+    },
+    "extensionDependencies": [
+        "julialang.language-julia"
+    ]
 }
