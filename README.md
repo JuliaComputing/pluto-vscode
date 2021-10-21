@@ -1,5 +1,5 @@
 # pluto-vscode
-Pluto inside a VS Code Webview, WIP. **You currently need some nodejs/npm skills to be able to run this, we don't ship a prebuilt extension yet.**
+Pluto inside a VS Code Webview, WIP. **You currently need some command line skills to be able to run this.**
 
 This extension will automatically:
 - Launch the Pluto server for you
@@ -12,22 +12,32 @@ Proxying the communication through VS Code means that this extension works insid
 
 https://user-images.githubusercontent.com/6933510/134571646-cca5239a-1edf-48ab-b2a2-7828df79c002.mov
 
-Instructions:
+## Step 1: Set up Julia
+
 1. Install Julia (1.5 - 1.7) and the Julia VS Code extension.
-2. Install the `vscode-webview-proxy` branch of Pluto, either using git and `pkg> dev folder/to/Pluto.jl` or `pkg> add Pluto#vscode-webview-proxy`.
-3. `pkg> add BetterFileWatching JSON`
+2. Install the `vscode-webview-proxy` branch of Pluto in your global package env, either using git and `pkg (v1.6)> dev folder/to/Pluto.jl` or `pkg (v1.6)> add Pluto#vscode-webview-proxy`. *This step will be automated in the future.*
 
-Now for the extension:
+## Step 2: Now for the extension
 
-4. Install node and npm
+If you are **developing** this extension:
+1. `pkg (v1.6)> add BetterFileWatching` if you are developing this extension
+1. Install node and npm
 4. Open the folder in VS Code
 4. Open the terminal and `npm install`
 4. Go to Run > Start Debugging (`F5`)
 
-Inside the VS Code editor that launched:
+If you just want to **run** the extension:
+1. Download the `.vsix` file from the repository.
+1. Launch VS Code
+1. `Cmd+Shift+P` and run `Extensions: Install from VSIX...`, select the VSIX file
 
-8. `Cmd+Shift+P` and run `Pluto: Start new notebook`
+## Step 3: How to use
+Inside the VS Code editor running the extension:
+
+1. `Cmd+Shift+P` and run `Pluto: Start new notebook`
 8. While waiting (max 60 seconds), `Cmd+Shift+P` and run `Developer: Open WebView Developer Tools`
+
+---
 
 To generate the `.vsix` file:
 1. Install `vsce`
