@@ -1,6 +1,15 @@
 /* eslint-disable @typescript-eslint/ban-types */
 /* eslint-disable @typescript-eslint/no-empty-function */
 
+/*
+This file is from Pluto's source code, with small changes to convert it from JS to TS, and to run it in Node.
+
+Original: https://github.com/fonsp/Pluto.jl/blob/v0.16.4/frontend/common/PlutoConnection.js
+
+It sets up and maintains a WS connection with the Pluto server. 
+
+*/
+
 import WebSocket from "ws"
 import * as vscode from "vscode"
 
