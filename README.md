@@ -47,7 +47,9 @@ To generate the `.vsix` file:
 
 # How it works
 
-This extension runs the normal Pluto server, and we use a *VS Code Webview* to display the (mostly) normal Pluto frontend inside VS Code!
+This extension runs the normal Pluto server, and we use a *VS Code Webview* to display the (mostly) normal Pluto frontend inside VS Code! 
+
+> 🙋 You should read https://code.visualstudio.com/api/extension-guides/webview before working on this extension.
 
 The main differences between using `pluto-vscode` and using Pluto the normal way are:
 - This extension will (install and) **launch Pluto for you**. It will use the `julia-vscode` extension to get the Julia executable, which means that the entire process until you see the notebook is handled by the extension.
