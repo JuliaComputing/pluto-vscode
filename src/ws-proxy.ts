@@ -13,9 +13,9 @@ export const create_proxy = ({
 }: {
     /** Address of the WebSocket server hosted by Pluto in this process. */
     ws_address: string
-    /** Let me send messages to the WebView frontend using VS Code API please. */
+    /** Let me send messages to the Webview frontend using VS Code API please. */
     send_to_client: any
-    /** Let me listen to messages from the WebView frontend using VS Code API please. */
+    /** Let me listen to messages from the Webview frontend using VS Code API please. */
     create_client_listener: any
     /** Function to call if the frontend wants to trigger a `window.alert`. */
     alert: any

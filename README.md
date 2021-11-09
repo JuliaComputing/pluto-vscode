@@ -35,7 +35,7 @@ If you just want to **run** the extension:
 Inside the VS Code editor running the extension:
 
 1. `Cmd+Shift+P` and run `Pluto: Start new notebook`
-8. While waiting (max 60 seconds), `Cmd+Shift+P` and run `Developer: Open WebView Developer Tools`
+8. While waiting (max 60 seconds), `Cmd+Shift+P` and run `Developer: Open Webview Developer Tools`
 
 ---
 
@@ -73,4 +73,4 @@ Now, the extension (running in Node.js) is *pretending* to be a browser-based Pl
 
 All the messages that it receives are passed along to the actual frontends, running inside webview. Conversely, any messages from the webview are passed along to the Pluto server by the extension.
 
-Communication between extension and Pluto server happens with the normal WebSocket code from Pluto (which works, because the extension and the Pluto server are always running on the same computer), communication between extension and webviews happens with [official VS Code API: `WebView.postMessage` and `WebView.onDidReceiveMessage`](https://code.visualstudio.com/api/references/vscode-api#Webview).
+Communication between extension and Pluto server happens with the normal WebSocket code from Pluto (which works, because the extension and the Pluto server are always running on the same computer), communication between extension and webviews happens with [official VS Code API: `Webview.postMessage` and `Webview.onDidReceiveMessage`](https://code.visualstudio.com/api/references/vscode-api#Webview).
