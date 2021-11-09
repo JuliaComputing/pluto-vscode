@@ -5,6 +5,7 @@ import { tmpdir } from "os"
 import { join } from "path"
 import { v4 as uuid } from "uuid"
 import { create_proxy } from "./ws-proxy"
+import { PlutoEditor } from "./PlutoEditor"
 
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -12,26 +13,10 @@ export function activate(context: vscode.ExtensionContext) {
             new_notebook(context)
         })
     )
-
-    // plutoViewPanel.createOrShow(context);
-
-    // if (vscode.window.registerWebviewPanelSerializer) {
-    // 	// Make sure we register a serializer in activation event
-    // 	vscode.window.registerWebviewPanelSerializer(plutoViewPanel.viewType, {
-    // 		async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
-    // 			console.log(`Got state: ${state}`);
-    // 			// Reset the webview options so we use latest uri for `localResourceRoots`.
-    // 			webviewPanel.webview.options = getWebviewOptions(
-    // 				context.extensionUri,
-    // 				pluto_asset_dir
-    // 			);
-    // 			plutoViewPanel.revive(webviewPanel, context);
-    // 		},
-    // 	});
-    // }
+    context.subscriptions.push(PlutoEditor.register(context));
 }
 
-function getWebviewOptions(extensionUri: vscode.Uri, pluto_asset_dir: string): vscode.WebviewOptions {
+export function getWebviewOptions(extensionUri: vscode.Uri, pluto_asset_dir: string): vscode.WebviewOptions {
     return {
         // Enable javascript in the webview
         enableScripts: true,
@@ -44,6 +29,17 @@ function getWebviewOptions(extensionUri: vscode.Uri, pluto_asset_dir: string): v
 const viewType = "plutoView"
 
 const pluto_asset_dir = join(tmpdir(), getNonce())
+
+export const LOADING_HTML = `<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <title>Loading...</title>
+    </head>
+    <body style="margin: 0px; padding: 0px; overflow: hidden; background: white;">
+        <h1>Loading...</h1>
+    </body>
+    </html>
+`
 
 function new_notebook(context: vscode.ExtensionContext) {
     console.info("Launching Pluto panel!")
@@ -80,22 +76,13 @@ function new_notebook(context: vscode.ExtensionContext) {
     }
     // Set the webview's initial html content
     set_html(
-        "Pluto loading...",
-        `<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <title>Loading...</title>
-    </head>
-    <body style="margin: 0px; padding: 0px; overflow: hidden; background: white;">
-        <h1>Loading...</h1>
-    </body>
-    </html>`
+        "Pluto loading...", LOADING_HTML
     )
 
     // launch the pluto server
 
     statusBarItem.text = "Pluto"
-    statusBarItem.command = "catalystgui.showOptions"
+    statusBarItem.command = "pluto.showOptions"
     statusBarItem.show()
     const backend = PlutoBackend.create(context, statusBarItem, {
         pluto_asset_dir,
@@ -157,7 +144,7 @@ function new_notebook(context: vscode.ExtensionContext) {
     })
 }
 
-function getNonce() {
+export function getNonce() {
     let text = ""
     const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     for (let i = 0; i < 32; i++) {

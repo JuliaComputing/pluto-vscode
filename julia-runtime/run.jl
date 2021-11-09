@@ -106,8 +106,11 @@ command_task = Pluto.@asynclog while true
 		generate_output(nb, editor_html_filename)
 	elseif type == "open"
 		editor_html_filename = detail["editor_html_filename"]
-		nb = Pluto.SessionActions.open(pluto_server_session, detail["path"])
-		
+		open(detail["jlfile"], "w") do f
+			write(f, detail["text"])
+		end
+		nb = Pluto.SessionActions.open(pluto_server_session, detail["jlfile"])
+
 		generate_output(nb, editor_html_filename)
 	else
 		@error "Message of this type not recognised. " type

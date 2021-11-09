@@ -16,7 +16,8 @@
     ],
     "activationEvents": [
         "onCommand:plutoView.start",
-        "onWebviewPanel:plutoView"
+        "onWebviewPanel:plutoView",
+        "onCustomEditor:plutoView"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -25,6 +26,18 @@
                 "command": "plutoView.start",
                 "title": "Start new notebook",
                 "category": "Pluto"
+            }
+        ],
+        "customEditors": [
+            {
+                "viewType": "plutoView",
+                "displayName": "Pluto",
+                "selector": [
+                    {
+                        "filenamePattern": "*.jl"
+                    }
+                ],
+                "priority": "option"
             }
         ]
     },
