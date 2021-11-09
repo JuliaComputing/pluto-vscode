@@ -115,10 +115,13 @@ function new_notebook(context: vscode.ExtensionContext) {
     statusBarItem.command = "pluto.showOptions"
     statusBarItem.show()
 
+    /** We ask VS Code to statically host Pluto's frontend assets. This is the root URL of the static host. */
+    const vscode_proxy_root = panel.webview.asWebviewUri(vscode.Uri.file(pluto_asset_dir))
+
     // Start creating a `backend`, i.e. start running the `julia-runtime/run.jl` script.
     const backend = PlutoBackend.create_async(context, statusBarItem, {
         pluto_asset_dir,
-        vscode_proxy_root: panel.webview.asWebviewUri(vscode.Uri.file(pluto_asset_dir)),
+        vscode_proxy_root,
         pluto_config: {
             // workspace_use_distributed: false,
         },
