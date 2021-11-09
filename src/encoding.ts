@@ -1,5 +1,7 @@
 import { Buffer } from "buffer"
 
+// Why oh why is this different in Node.js :((((((
+
 export const base64_arraybuffer = (data_buffer: ArrayBuffer): Promise<string> => {
     const buf = Buffer.from(data_buffer)
     return Promise.resolve(buf.toString("base64"))
