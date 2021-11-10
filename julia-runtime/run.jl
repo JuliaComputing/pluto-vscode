@@ -19,7 +19,7 @@ end
 
 ####
 @info "PLUTO SETUP"
-
+using Base64
 import Pkg
 Pkg.instantiate()
 
@@ -86,7 +86,7 @@ end
 catch end
 
 
-
+filenbmap = Dict()
 
 command_task = Pluto.@asynclog while true
 	
@@ -110,12 +110,41 @@ command_task = Pluto.@asynclog while true
 			write(f, detail["text"])
 		end
 		nb = Pluto.SessionActions.open(pluto_server_session, detail["jlfile"])
-
+		filenbmap[detail["jlfile"]] = nb
 		generate_output(nb, editor_html_filename)
 	else
 		@error "Message of this type not recognised. " type
 	end
 	
+end
+
+#=
+Watch the folder where pluto stores the files and emit
+messages to the VSCode extension (stderr, file update event)
+so the (possibly remote) VSCode knows that the files changed.
+Only watch 'Modified' event.
+=#
+@async try
+	BetterFileWatching.watch_folder(".") do event
+		@info "Pluto files changed!" event
+		paths = event.paths
+		!(event isa BetterFileWatching.Modified) && return nothing
+		length(paths) !== 1 && return nothing
+		path = replace(paths[1], "/./" => "/")
+		matchingpair = filter(collect(filenbmap)) do (filename, notebook)
+			occursin(filename, path)
+		end
+		length(matchingpair) === 0 && return nothing
+		nb = matchingpair[1][2]
+		io = IOBuffer()
+		# io64 = Base64EncodePipe(io)
+		Pluto.save_notebook(io, nb)
+		# close(io64)
+		@info "File update event ## $(String(take!(io)))"
+	end
+catch e
+	@info "Error occured in filewatching..."
+	showerror(stderr, e, catch_backtrace())
 end
 
 

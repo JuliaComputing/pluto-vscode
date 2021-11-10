@@ -107,7 +107,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			})
 			const handler = setInterval(() => {
 				try {
-					console.log("checking file existance!")
+					console.log("checking file existence!")
 					accessSync(join(this.pluto_asset_dir, editor_html_filename))
 					console.log("file exists!")
 

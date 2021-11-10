@@ -77,7 +77,7 @@ export class PlutoBackend {
         // find a free port, some random sampling to make collisions less likely
         this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23047)
 
-        let resolve_ready = (x: boolean) => {}
+        let resolve_ready = (x: boolean) => { }
         this.ready = new Promise<boolean>((r) => {
             resolve_ready = r
         })
@@ -102,6 +102,12 @@ export class PlutoBackend {
             })
             this._process.stderr!.on("data", (data) => {
                 const text = data.slice(0, data.length - 1)
+                if (text.includes("File update event ## ")) {
+                    const notebookString = data.slice(data.indexOf("## ")).toString()
+                    console.log("Notebook updated!", notebookString.substr(0, 10))
+                    return
+                }
+
                 console.log(`📈${text}`)
 
                 // @info prints to stderr

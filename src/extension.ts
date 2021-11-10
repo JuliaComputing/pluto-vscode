@@ -103,7 +103,7 @@ function new_notebook(context: vscode.ExtensionContext) {
 
         const handler = setInterval(() => {
             try {
-                console.log("checking file existance!")
+                console.log("checking file existence!")
                 accessSync(join(pluto_asset_dir, editor_html_filename))
                 console.log("file exists!")
 
