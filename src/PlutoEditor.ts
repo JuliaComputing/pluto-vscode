@@ -83,6 +83,18 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 		const backend = PlutoBackend.create(this.context, statusBarItem, {
 			pluto_asset_dir: this.pluto_asset_dir,
+			on_filechange(f: string) {
+				// TODO: 
+				// 1. Throttle
+				// 2. Make more minimal changes (even though Pluto doesn't!)
+				//
+				const edit = new vscode.WorkspaceEdit();
+				edit.replace(
+					document.uri,
+					new vscode.Range(0, 0, document.lineCount, 0),
+					f)
+				vscode.workspace.applyEdit(edit)
+			},
 			vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(this.pluto_asset_dir)),
 			pluto_config: {
 				// workspace_use_distributed: false,

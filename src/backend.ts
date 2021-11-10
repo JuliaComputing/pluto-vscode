@@ -4,10 +4,12 @@ import * as path from "path"
 import { v4 as uuid } from "uuid"
 import portastic from "portastic"
 import _ from "lodash"
+import { decode_base64_to_string } from "./encoding"
 
 type BackendOpts = {
     pluto_asset_dir: string
     vscode_proxy_root: vscode.Uri
+    on_filechange: Function
     pluto_config?: Object
 }
 
@@ -60,6 +62,7 @@ export class PlutoBackend {
 
     private _status: vscode.StatusBarItem
     private _process?: cp.ChildProcess
+    private _opts?: BackendOpts
 
     public port: Promise<number>
     public secret: string
@@ -68,7 +71,7 @@ export class PlutoBackend {
 
     private constructor(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
         this._status = status
-
+        this._opts = opts
         console.log("Starting PlutoBackend...")
 
         this._status.text = "Pluto: starting..."
@@ -102,9 +105,12 @@ export class PlutoBackend {
             })
             this._process.stderr!.on("data", (data) => {
                 const text = data.slice(0, data.length - 1)
+                // TODO: Generalize this!
                 if (text.includes("File update event ## ")) {
-                    const notebookString = data.slice(data.indexOf("## ")).toString()
+                    const notebookString = data.slice(data.indexOf("## "), data.indexOf("###") - data.indexOf("## ")).toString()
                     console.log("Notebook updated!", notebookString.substr(0, 10))
+                    // Let VSCode know the file changed
+                    this._opts?.on_filechange?.(decode_base64_to_string(notebookString))
                     return
                 }
 
