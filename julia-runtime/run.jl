@@ -138,7 +138,7 @@ Only watch 'Modified' event.
 		nb = matchingpair[1][2]
 		io = IOBuffer()
 		io64 = Base64EncodePipe(io)
-		Pluto.save_notebook(io, nb)
+		Pluto.save_notebook(io64, nb)
 		close(io64)
 		@info "File update event ## $(String(take!(io))) ###"
 	end
