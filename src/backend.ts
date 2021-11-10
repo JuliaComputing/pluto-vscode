@@ -105,7 +105,7 @@ export class PlutoBackend {
             })
             this._process.stderr!.on("data", (data) => {
                 const text = data.slice(0, data.length - 1)
-                // TODO: Generalize this!
+                // TODO: Generalize this for more message types to be added
                 if (text.includes("File update event ## ")) {
                     const notebookString = data.slice(data.indexOf("## "), data.indexOf("###") - data.indexOf("## ")).toString()
                     console.log("Notebook updated!", notebookString.substr(0, 10))

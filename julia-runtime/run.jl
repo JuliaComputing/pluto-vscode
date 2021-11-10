@@ -131,11 +131,11 @@ Only watch 'Modified' event.
 		!(event isa BetterFileWatching.Modified) && return nothing
 		length(paths) !== 1 && return nothing
 		path = replace(paths[1], "/./" => "/")
-		matchingpair = filter(collect(filenbmap)) do (filename, notebook)
+		nb_list = filter(collect(filenbmap)) do (filename, notebook)
 			occursin(filename, path)
 		end
-		length(matchingpair) === 0 && return nothing
-		nb = matchingpair[1][2]
+		length(nb_list) === 0 && return nothing
+		nb = nb_list[1][2]
 		io = IOBuffer()
 		io64 = Base64EncodePipe(io)
 		Pluto.save_notebook(io64, nb)
