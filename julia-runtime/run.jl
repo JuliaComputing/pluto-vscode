@@ -89,9 +89,9 @@ end
 @info "Watching Pluto folder for changes!"
 catch end
 
-
+# TODO: Maybe it's better to read the actual Pluto session
 filenbmap = Dict()
-
+ignorenextchange = false
 command_task = Pluto.@asynclog while true
 	
 	new_command_str_raw = readuntil(stdin, '\0')
@@ -116,10 +116,18 @@ command_task = Pluto.@asynclog while true
 		nb = Pluto.SessionActions.open(pluto_server_session, jlpath)
 		filenbmap[detail["jlfile"]] = nb
 		generate_output(nb, editor_html_filename)
+	elseif type == "update"
+		ignorenextchange = true
+		nb = filenbmap[detail["jlfile"]]
+		jlpath = joinpath(jlfilesroot, detail["jlfile"])
+		open(jlpath, "w") do f
+			write(f, detail["text"])
+		end
+		Pluto.update_from_file(pluto_server_session, nb)
 	elseif type == "shutdown"
 		Pluto.SessionActions.shutdown(
 			pluto_server_session,
-			filenbmap[detail["jlfile"]];
+			filenbmap.get(detail["jlfile"]);
 			keep_in_session=false
 		)
 	else
@@ -136,6 +144,10 @@ Only watch 'Modified' event.
 =#
 @async try
 	BetterFileWatching.watch_folder(jlfilesroot) do event
+		if ignorenextchange
+			ignorenextchange = false
+			return
+		end
 		@info "Pluto files changed!" event
 		paths = event.paths
 		!(event isa BetterFileWatching.Modified) && return nothing

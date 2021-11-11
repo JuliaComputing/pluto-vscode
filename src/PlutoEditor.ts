@@ -62,25 +62,6 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		let disposed: boolean = false
 		let disposables: vscode.Disposable[] = []
 
-		// Hook up event handlers so that we can synchronize the webview with the text document.
-		//
-		// The text document acts as our model, so we have to sync change in the document to our
-		// editor and sync changes in the editor back to the document.
-		// 
-		// Remember that a single text document can also be shared between multiple custom
-		// editors (this happens for example when you split a custom editor)
-
-		const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
-			if (e.document.uri.toString() === document.uri.toString()) {
-				// updateWebview();
-				// Inform Pluto to reload? (YES: TODO: Change pluto's file, Pluto is not watching here)
-			}
-		});
-		// onDidChangeTextDocument, 
-		// onDidDeleteFiles,
-		// onDidSaveTextDocument,
-		// onDidRenameFiles (or will, dunno!)
-
 		const set_html = (title: string, contents: string) => {
 			webviewPanel.title = title
 			webviewPanel.webview.html = contents
@@ -122,7 +103,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 					try {
 						vscode.workspace.applyEdit(edit)
 					} catch (err) {
-						console.log("Concurrently changed document - trying again in 500ms")
+						console.log("Concurrently changed document - trying again in 500ms", err)
 						setTimeout(() => vscode.workspace.applyEdit(edit), 500)
 					}
 				}
@@ -132,6 +113,26 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				// workspace_use_distributed: false,
 			},
 		})
+
+		// Hook up event handlers so that we can synchronize the webview with the text document.
+		//
+		// The text document acts as our model, so we have to sync change in the document to our
+		// editor and sync changes in the editor back to the document.
+		// 
+		// Remember that a single text document can also be shared between multiple custom
+		// editors (this happens for example when you split a custom editor)
+
+		const changeDocumentSubscription = vscode.workspace.onDidSaveTextDocument(doc => {
+			if (doc.uri.toString() === document.uri.toString()) {
+				// When VSCode updates the document, notify pluto from here	
+				backend.send_command("update", { jlfile, text: doc.getText() })
+			}
+		});
+
+		// onDidChangeTextDocument, 
+		// onDidDeleteFiles,
+		// onDidSaveTextDocument,
+		// onDidRenameFiles (or will, dunno!)
 
 		// Make sure we get rid of the listener when our editor is closed.
 		webviewPanel.onDidDispose(() => {
