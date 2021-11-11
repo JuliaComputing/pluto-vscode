@@ -111,12 +111,6 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				if (webviewsForFile.length === 0) {
 					return
 				}
-				const jlfile = `editor_bespoke_${uuidv4}.jl`;
-				console.log(JSON.stringify({ file, jlfile }))
-				if (file !== jlfile) {
-					console.log(`Got update for another file. No thank you! ${file} ${jlfile}`)
-					return
-				}
 				const [{ document, uri }] = webviewsForFile
 				const t = document.getText()
 				if (t !== f) { // This will help a bit
