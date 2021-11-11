@@ -67,17 +67,21 @@ function generate_output(nb::Pluto.Notebook, filename::String, frontend_params::
 end
 
 
-copy_assets() = cp(Pluto.project_relative_path("frontend"), asset_output_dir; force=true)
+copy_assets(force=true) = cp(Pluto.project_relative_path("frontend"), asset_output_dir; force=force)
 
 copy_assets()
 
+jlfilesroot = mkpath(joinpath(asset_output_dir, "jlfiles/"))
 
 try
 import BetterFileWatching
 @async try
 	BetterFileWatching.watch_folder(Pluto.project_relative_path("frontend")) do event
 		@info "Pluto asset changed!"
-		copy_assets()
+		# It's not safe to remove the folder
+		# because we reuse HTML files
+		copy_assets(false)
+		mkpath(joinpath(asset_output_dir, "jlfiles/"))
 	end
 catch e
 	showerror(stderr, e, catch_backtrace())
@@ -102,14 +106,14 @@ command_task = Pluto.@asynclog while true
 	if type == "new"
 		editor_html_filename = detail["editor_html_filename"]
 		nb = Pluto.SessionActions.new(pluto_server_session)
-		
 		generate_output(nb, editor_html_filename)
 	elseif type == "open"
 		editor_html_filename = detail["editor_html_filename"]
-		open(vscode_proxy_root * detail["jlfile"], "w") do f
+		jlpath = joinpath(jlfilesroot, detail["jlfile"])
+		open(jlpath, "w") do f
 			write(f, detail["text"])
 		end
-		nb = Pluto.SessionActions.open(pluto_server_session, detail["jlfile"])
+		nb = Pluto.SessionActions.open(pluto_server_session, jlpath)
 		filenbmap[detail["jlfile"]] = nb
 		generate_output(nb, editor_html_filename)
 	elseif type == "shutdown"
@@ -131,7 +135,7 @@ so the (possibly remote) VSCode knows that the files changed.
 Only watch 'Modified' event.
 =#
 @async try
-	BetterFileWatching.watch_folder(vscode_proxy_root) do event
+	BetterFileWatching.watch_folder(jlfilesroot) do event
 		@info "Pluto files changed!" event
 		paths = event.paths
 		!(event isa BetterFileWatching.Modified) && return nothing

@@ -56,7 +56,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const editor_html_filename = `editor_bespoke_${uuidv4}.html`
 		const jlfile = `editor_bespoke_${uuidv4}.jl`
 
-		this.webviews.add(document.uri, uuidv4, webviewPanel);
+		this.webviews.add(document, uuidv4, webviewPanel);
 		webviewPanel.webview.html = LOADING_HTML;
 
 		let disposed: boolean = false
@@ -89,23 +89,40 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 		const backend = PlutoBackend.create(this.context, statusBarItem, {
 			pluto_asset_dir: this.pluto_asset_dir,
-			on_filechange(file: string, f: string) {
+			/**
+			 * VERY important implementation detail:
+			 * This function gets instanciated only the _first_ time the 
+			 * pluto editor runs.
+			 * 
+			 * That means, the code must *not* create closures around the
+			 * initial context because subsequent webviews do not apply.
+			 * 
+			 * we use this.webviews.getByUUID for this exact reason.
+			 * 
+			 */
+			on_filechange: (file: string, f: string) => {
 				// TODO: 
 				// 1. Throttle
 				// 2. Serialize
 				// 3. Make more minimal changes (even though Pluto doesn't!)
 				//
+				const uuidv4 = file.replace("editor_bespoke_", "").replace(".jl", "")
+				const webviewsForFile = Array.from(this.webviews.getByUUID(uuidv4))
+				if (webviewsForFile.length === 0) {
+					return
+				}
+				const jlfile = `editor_bespoke_${uuidv4}.jl`;
 				console.log(JSON.stringify({ file, jlfile }))
 				if (file !== jlfile) {
 					console.log(`Got update for another file. No thank you! ${file} ${jlfile}`)
 					return
 				}
-				console.log("Correct file, let's do this")
+				const [{ document, uri }] = webviewsForFile
 				const t = document.getText()
 				if (t !== f) { // This will help a bit
 					const edit = new vscode.WorkspaceEdit();
 					edit.replace(
-						document.uri,
+						uri,
 						new vscode.Range(0, 0, document.lineCount, 0),
 						f)
 					try {
@@ -114,8 +131,6 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 						console.log("Concurrently changed document - trying again in 500ms")
 						setTimeout(() => vscode.workspace.applyEdit(edit), 500)
 					}
-				} else {
-					console.info("This could be an update but it's okey!")
 				}
 			},
 			vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(this.pluto_asset_dir)),
@@ -127,7 +142,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// Make sure we get rid of the listener when our editor is closed.
 		webviewPanel.onDidDispose(() => {
 			disposed = true
-			const others = Array.from(this.webviews.get(document.uri)).filter(conatiner => conatiner.webviewPanel !== webviewPanel)
+			const others = Array.from(this.webviews.get(document.uri)).filter(c => c.webviewPanel !== webviewPanel)
 			if (others.length === 0) {
 				backend.send_command("shutdown", { jlfile })
 			}
@@ -218,8 +233,10 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 class WebviewCollection {
 
 	private readonly _webviews = new Set<{
+		readonly document: vscode.TextDocument;
 		readonly resource: string;
 		readonly uuidv4: string;
+		readonly uri: vscode.Uri;
 		readonly webviewPanel: vscode.WebviewPanel;
 	}>();
 
@@ -227,7 +244,9 @@ class WebviewCollection {
 	 * Get all known webviews for a given uri.
 	 */
 	public *get(uri: vscode.Uri): Iterable<{
+		readonly document: vscode.TextDocument;
 		readonly resource: string;
+		readonly uri: vscode.Uri;
 		readonly uuidv4: string;
 		readonly webviewPanel: vscode.WebviewPanel;
 	}> {
@@ -239,11 +258,25 @@ class WebviewCollection {
 		}
 	}
 
+	public *getByUUID(uuid: string): Iterable<{
+		readonly document: vscode.TextDocument;
+		readonly resource: string;
+		readonly uuidv4: string;
+		readonly uri: vscode.Uri;
+		readonly webviewPanel: vscode.WebviewPanel;
+	}> {
+		const key = uuid;
+		for (const entry of this._webviews) {
+			if (entry.uuidv4 === key) {
+				yield entry;
+			}
+		}
+	}
 	/**
 	 * Add a new webview to the collection.
 	 */
-	public add(uri: vscode.Uri, uuidv4: string, webviewPanel: vscode.WebviewPanel) {
-		const entry = { resource: uri.toString(), uuidv4, webviewPanel };
+	public add(document: vscode.TextDocument, uuidv4: string, webviewPanel: vscode.WebviewPanel) {
+		const entry = { document, resource: document.uri.toString(), uuidv4, uri: document.uri, webviewPanel };
 		this._webviews.add(entry);
 
 		webviewPanel.onDidDispose(() => {
@@ -268,7 +301,7 @@ class WebviewCollection {
 		for (const entry of this._webviews) {
 			if (entry.resource === key) {
 				this._webviews.delete(entry);
-				const newentry = { resource: newUri.toString(), uuidv4: entry.uuidv4, webviewPanel: entry.webviewPanel };
+				const newentry = { document: entry.document, resource: newUri.toString(), uri: entry.uri, uuidv4: entry.uuidv4, webviewPanel: entry.webviewPanel };
 				this._webviews.add(newentry)
 			}
 		}
