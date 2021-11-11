@@ -89,12 +89,18 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 		const backend = PlutoBackend.create(this.context, statusBarItem, {
 			pluto_asset_dir: this.pluto_asset_dir,
-			on_filechange(f: string) {
+			on_filechange(file: string, f: string) {
 				// TODO: 
 				// 1. Throttle
 				// 2. Serialize
 				// 3. Make more minimal changes (even though Pluto doesn't!)
 				//
+				console.log(JSON.stringify({ file, jlfile }))
+				if (file !== jlfile) {
+					console.log(`Got update for another file. No thank you! ${file} ${jlfile}`)
+					return
+				}
+				console.log("Correct file, let's do this")
 				const t = document.getText()
 				if (t !== f) { // This will help a bit
 					const edit = new vscode.WorkspaceEdit();
@@ -124,8 +130,6 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			const others = Array.from(this.webviews.get(document.uri)).filter(conatiner => conatiner.webviewPanel !== webviewPanel)
 			if (others.length === 0) {
 				backend.send_command("shutdown", { jlfile })
-				// Shutting down takes a few moments
-				setTimeout(() => PlutoBackend.cleanupfiles(jlfile), 1000)
 			}
 			changeDocumentSubscription.dispose();
 		});

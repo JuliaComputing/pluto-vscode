@@ -42,26 +42,9 @@ export class PlutoBackend {
         PlutoBackend._instance = new PlutoBackend(context, status, opts)
         return PlutoBackend._instance
     }
-    public static cleanupfiles(filename = "bespoke_editor") {
 
-        if (PlutoBackend._instance) {
-            try {
-                const wd = PlutoBackend._instance.working_directory
-                const files = Array.from(readdirSync(wd))
-                console.log(files)
-                for (const file of files)
-                    if (file.toString().toLowerCase().includes(filename.substr(0, 51))) {
-                        console.log("Unlinking", path.join(wd, file))
-                        unlinkSync(path.join(wd, file))
-                    }
-            } catch (err) {
-                console.error("Coudn't remove all files", err)
-            }
-        }
-    }
     public static deactivate() {
         if (PlutoBackend._instance) {
-            PlutoBackend.cleanupfiles()
             PlutoBackend._instance.destroy()
         }
     }
@@ -126,11 +109,13 @@ export class PlutoBackend {
             this._process.stderr!.on("data", (data) => {
                 const text = data.slice(0, data.length - 1)
                 // TODO: Generalize this for more message types to be added
-                if (text.includes("File update event ## ")) {
+                if (text.includes("Command: [[Notebook=")) {
+                    const jlfile = data.slice(data.indexOf("=") + 1, data.indexOf("]]")).toString().trim()
+                    console.log("jlfile", jlfile)
                     const notebookString = data.slice(data.indexOf("## "), data.indexOf("###") - data.indexOf("## ")).toString()
                     console.log("Notebook updated!", notebookString.substr(0, 10))
                     // Let VSCode know the file changed
-                    this._opts?.on_filechange?.(decode_base64_to_string(notebookString))
+                    this._opts?.on_filechange?.(jlfile, decode_base64_to_string(notebookString))
                     return
                 }
 
@@ -149,7 +134,6 @@ export class PlutoBackend {
     public destroy() {
         this._status.hide()
         this._process?.kill()
-        PlutoBackend.cleanupfiles()
         PlutoBackend._instance = null
 
         this._status.text = "Pluto: killing..."

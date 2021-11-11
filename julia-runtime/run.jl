@@ -106,7 +106,7 @@ command_task = Pluto.@asynclog while true
 		generate_output(nb, editor_html_filename)
 	elseif type == "open"
 		editor_html_filename = detail["editor_html_filename"]
-		open(detail["jlfile"], "w") do f
+		open(vscode_proxy_root * detail["jlfile"], "w") do f
 			write(f, detail["text"])
 		end
 		nb = Pluto.SessionActions.open(pluto_server_session, detail["jlfile"])
@@ -131,7 +131,7 @@ so the (possibly remote) VSCode knows that the files changed.
 Only watch 'Modified' event.
 =#
 @async try
-	BetterFileWatching.watch_folder(".") do event
+	BetterFileWatching.watch_folder(vscode_proxy_root) do event
 		@info "Pluto files changed!" event
 		paths = event.paths
 		!(event isa BetterFileWatching.Modified) && return nothing
@@ -146,7 +146,7 @@ Only watch 'Modified' event.
 		io64 = Base64EncodePipe(io)
 		Pluto.save_notebook(io64, nb)
 		close(io64)
-		@info "File update event ## $(String(take!(io))) ###"
+		@info "Command: [[Notebook=$(string(nb_list[1][1]))]] ## $(String(take!(io))) ###"
 	end
 catch e
 	@info "Error occured in filewatching..."
