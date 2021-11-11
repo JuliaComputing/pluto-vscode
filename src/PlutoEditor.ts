@@ -73,40 +73,62 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const changeDocumentSubscription = vscode.workspace.onDidChangeTextDocument(e => {
 			if (e.document.uri.toString() === document.uri.toString()) {
 				// updateWebview();
-				// Inform Pluto to reload? (No - Pluto should be already watching)
+				// Inform Pluto to reload? (YES: TODO: Change pluto's file, Pluto is not watching here)
 			}
 		});
+		// onDidChangeTextDocument, 
+		// onDidDeleteFiles,
+		// onDidSaveTextDocument,
+		// onDidRenameFiles (or will, dunno!)
 
 		const set_html = (title: string, contents: string) => {
 			webviewPanel.title = title
 			webviewPanel.webview.html = contents
 		}
 
-		// Make sure we get rid of the listener when our editor is closed.
-		webviewPanel.onDidDispose(() => {
-			changeDocumentSubscription.dispose();
-			// Panel?
-		});
 		const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 		const backend = PlutoBackend.create(this.context, statusBarItem, {
 			pluto_asset_dir: this.pluto_asset_dir,
 			on_filechange(f: string) {
 				// TODO: 
 				// 1. Throttle
-				// 2. Make more minimal changes (even though Pluto doesn't!)
+				// 2. Serialize
+				// 3. Make more minimal changes (even though Pluto doesn't!)
 				//
-				const edit = new vscode.WorkspaceEdit();
-				edit.replace(
-					document.uri,
-					new vscode.Range(0, 0, document.lineCount, 0),
-					f)
-				vscode.workspace.applyEdit(edit)
+				const t = document.getText()
+				if (t !== f) { // This will help a bit
+					const edit = new vscode.WorkspaceEdit();
+					edit.replace(
+						document.uri,
+						new vscode.Range(0, 0, document.lineCount, 0),
+						f)
+					try {
+						vscode.workspace.applyEdit(edit)
+					} catch (err) {
+						console.log("Concurrently changed document - trying again in 500ms")
+						setTimeout(() => vscode.workspace.applyEdit(edit), 500)
+					}
+				} else {
+					console.info("This could be an update but it's okey!")
+				}
 			},
 			vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(this.pluto_asset_dir)),
 			pluto_config: {
 				// workspace_use_distributed: false,
 			},
 		})
+
+		// Make sure we get rid of the listener when our editor is closed.
+		webviewPanel.onDidDispose(() => {
+			disposed = true
+			const others = Array.from(this.webviews.get(document.uri)).filter(conatiner => conatiner.webviewPanel !== webviewPanel)
+			if (others.length === 0) {
+				backend.send_command("shutdown", { jlfile })
+				// Shutting down takes a few moments
+				setTimeout(() => PlutoBackend.cleanupfiles(jlfile), 1000)
+			}
+			changeDocumentSubscription.dispose();
+		});
 
 		backend.ready.then(async () => {
 			// TODO: Something with the document's URI here. Same files should get the same html.
@@ -140,6 +162,8 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 						await create_proxy({
 							ws_address: `ws://localhost:${await backend.port}/?secret=${backend.secret}`,
 							send_to_client: (x: any) => {
+								// TODO: the fact that this is called when disposed
+								// means we're memory leaking. Fix that!
 								if (!disposed) {
 									return webviewPanel.webview.postMessage(x)
 								}

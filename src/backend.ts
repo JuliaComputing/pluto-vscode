@@ -5,6 +5,7 @@ import { v4 as uuid } from "uuid"
 import portastic from "portastic"
 import _ from "lodash"
 import { decode_base64_to_string } from "./encoding"
+import { readdirSync, unlinkSync } from "fs"
 
 type BackendOpts = {
     pluto_asset_dir: string
@@ -12,7 +13,6 @@ type BackendOpts = {
     on_filechange: Function
     pluto_config?: Object
 }
-
 const get_julia_command = async (): Promise<string> => {
     const julia_extension = vscode.extensions.getExtension("julialang.language-julia")
 
@@ -42,8 +42,26 @@ export class PlutoBackend {
         PlutoBackend._instance = new PlutoBackend(context, status, opts)
         return PlutoBackend._instance
     }
+    public static cleanupfiles(filename = "bespoke_editor") {
+
+        if (PlutoBackend._instance) {
+            try {
+                const wd = PlutoBackend._instance.working_directory
+                const files = Array.from(readdirSync(wd))
+                console.log(files)
+                for (const file of files)
+                    if (file.toString().toLowerCase().includes(filename.substr(0, 51))) {
+                        console.log("Unlinking", path.join(wd, file))
+                        unlinkSync(path.join(wd, file))
+                    }
+            } catch (err) {
+                console.error("Coudn't remove all files", err)
+            }
+        }
+    }
     public static deactivate() {
         if (PlutoBackend._instance) {
+            PlutoBackend.cleanupfiles()
             PlutoBackend._instance.destroy()
         }
     }
@@ -63,6 +81,7 @@ export class PlutoBackend {
     private _status: vscode.StatusBarItem
     private _process?: cp.ChildProcess
     private _opts?: BackendOpts
+    public working_directory: string
 
     public port: Promise<number>
     public secret: string
@@ -73,6 +92,7 @@ export class PlutoBackend {
         this._status = status
         this._opts = opts
         console.log("Starting PlutoBackend...")
+        this.working_directory = path.join(context.extensionPath, "julia-runtime")
 
         this._status.text = "Pluto: starting..."
         this._status.show()
@@ -91,7 +111,7 @@ export class PlutoBackend {
             const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })
             this._process = cp.spawn(julia_cmd, ["--project=.", "run.jl", ...args], {
-                cwd: path.join(context.extensionPath, "julia-runtime"),
+                cwd: this.working_directory,
             })
 
             this._process.on("exit", (code) => {
@@ -129,6 +149,7 @@ export class PlutoBackend {
     public destroy() {
         this._status.hide()
         this._process?.kill()
+        PlutoBackend.cleanupfiles()
         PlutoBackend._instance = null
 
         this._status.text = "Pluto: killing..."

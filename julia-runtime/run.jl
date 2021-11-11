@@ -112,6 +112,12 @@ command_task = Pluto.@asynclog while true
 		nb = Pluto.SessionActions.open(pluto_server_session, detail["jlfile"])
 		filenbmap[detail["jlfile"]] = nb
 		generate_output(nb, editor_html_filename)
+	elseif type == "shutdown"
+		Pluto.SessionActions.shutdown(
+			pluto_server_session,
+			filenbmap[detail["jlfile"]];
+			keep_in_session=false
+		)
 	else
 		@error "Message of this type not recognised. " type
 	end
