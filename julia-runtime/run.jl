@@ -27,20 +27,6 @@ import JSON
 using Suppressor
 
 import Pluto
-# We spin up Pluto from here.
-pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
-	port=port,
-	launch_browser=false,
-	# show_file_system=false,
-	dismiss_update_notification=true,
-	auto_reload_from_file=true,
-	(Symbol(k) => v for (k, v) in JSON.parse(pluto_launch_params))...,
-	
-)
-pluto_server_session = Pluto.ServerSession(;
-	secret=secret,
-	options=pluto_server_options,
-)
 
 #=  These are the function which document how we communicate, through STDIN
 # with the extension =#
@@ -64,9 +50,30 @@ end
 	notebooks::Dict{String, Pluto.Notebook}
 	session::Pluto.ServerSession
 	session_options::Any
+	jlfilesroot::String
 end
 
-extensionData = PlutoExtensionSessionData(Dict(), Dict(), pluto_server_session, pluto_server_options)
+# We spin up Pluto from here.
+pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
+	port=port,
+	launch_browser=false,
+	# show_file_system=false,
+	dismiss_update_notification=true,
+	auto_reload_from_file=true,
+	(Symbol(k) => v for (k, v) in JSON.parse(pluto_launch_params))...,
+	
+)
+pluto_server_session = Pluto.ServerSession(;
+	secret=secret,
+	options=pluto_server_options,
+)
+extensionData = PlutoExtensionSessionData(
+	Dict(),
+	Dict(),
+	pluto_server_session,
+	pluto_server_options,
+	mkpath(joinpath(asset_output_dir, "jlfiles/"))
+)
 
 function whenNotebookUpdates(jlfile, newString)
 	filename = splitpath(jlfile)[end]
@@ -106,25 +113,23 @@ end
 
 
 copy_assets(force=true) = cp(Pluto.project_relative_path("frontend"), asset_output_dir; force=force)
-
 copy_assets()
 
-jlfilesroot = mkpath(joinpath(asset_output_dir, "jlfiles/"))
-
-try
-import BetterFileWatching
-@async try
-	BetterFileWatching.watch_folder(Pluto.project_relative_path("frontend")) do event
-		@info "Pluto asset changed!"
-		# It's not safe to remove the folder
-		# because we reuse HTML files
-		copy_assets(false)
-		mkpath(joinpath(asset_output_dir, "jlfiles/"))
+try ## Note: This is to assist with co-developing Pluto & this Extension
+	## In a production setting it's not necessary to watch pluto folder for updates
+	import BetterFileWatching
+	@async try
+		BetterFileWatching.watch_folder(Pluto.project_relative_path("frontend")) do event
+			@info "Pluto asset changed!"
+			# It's not safe to remove the folder
+			# because we reuse HTML files
+			copy_assets(false)
+			mkpath(joinpath(asset_output_dir, "jlfiles/"))
+		end
+	catch e
+		showerror(stderr, e, catch_backtrace())
 	end
-catch e
-	showerror(stderr, e, catch_backtrace())
-end
-@info "Watching Pluto folder for changes!"
+	@info "Watching Pluto folder for changes!"
 catch end
 
 command_task = Pluto.@asynclog while true
@@ -142,7 +147,7 @@ command_task = Pluto.@asynclog while true
 		generate_output(nb, editor_html_filename)
 	elseif type == "open"
 		editor_html_filename = detail["editor_html_filename"]
-		jlpath = joinpath(jlfilesroot, detail["jlfile"])
+		jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
 		extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
 		open(jlpath, "w") do f
 			write(f, detail["text"])
@@ -152,7 +157,7 @@ command_task = Pluto.@asynclog while true
 		generate_output(nb, editor_html_filename)
 	elseif type == "update"
 		nb = filenbmap[detail["jlfile"]]
-		jlpath = joinpath(jlfilesroot, detail["jlfile"])
+		jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
 		open(jlpath, "w") do f
 			write(f, detail["text"])
 		end
@@ -170,43 +175,6 @@ command_task = Pluto.@asynclog while true
 	end
 	
 end
-
-#=
-Watch the folder where pluto stores the files and emit
-messages to the VSCode extension (stderr, file update event)
-so the (possibly remote) VSCode knows that the files changed.
-Only watch 'Modified' event.
-=#
-# @async try
-# 	BetterFileWatching.watch_folder(jlfilesroot) do event
-# 		if ignorenextchange
-# 			# this is not correct
-# 			global ignorenextchange = false
-# 			return
-# 		end
-# 
-# 		@info "Pluto files changed!" event
-# 		paths = event.paths
-# 		!(event isa BetterFileWatching.Modified) && return nothing
-# 		length(paths) !== 1 && return nothing
-# 		path = replace(paths[1], "/./" => "/")
-# 		nb_list = filter(collect(filenbmap)) do (filename, notebook)
-# 			occursin(filename, path) && !occursin("backup 1", path)
-# 		end
-# 		length(nb_list) === 0 && return nothing
-# 		nb = nb_list[1][2]
-# 		io = IOBuffer()
-# 		io64 = Base64EncodePipe(io)
-# 		Pluto.save_notebook(io64, nb)
-# 		close(io64)
-# 		@info "Command: [[Notebook=$(string(nb_list[1][1]))]] ## $(String(take!(io))) ###"
-# 	end
-# catch e
-# 	@info "Error occured in filewatching..."
-# 	showerror(stderr, e, catch_backtrace())
-# end
-# { "type": "open", "detail":{"jlfile": "/home/pgeorgakopoulos/julia/pluto-vscode/julia-runtime/test.jl", "editor_html_filename": "test.html"} } ?
-
 
 ####
 @info "RUNNING PLUTO SERVER..."
