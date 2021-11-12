@@ -95,6 +95,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				const [{ document, uri }] = webviewsForFile
 				const t = document.getText()
 				if (t !== f) { // This will help a bit
+					// use vscode.TextEdit instead!
 					const edit = new vscode.WorkspaceEdit();
 					edit.replace(
 						uri,

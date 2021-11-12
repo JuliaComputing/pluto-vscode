@@ -112,10 +112,12 @@ export class PlutoBackend {
                 if (text.includes("Command: [[Notebook=")) {
                     const jlfile = data.slice(data.indexOf("=") + 1, data.indexOf("]]")).toString().trim()
                     console.log("jlfile", jlfile)
-                    const notebookString = data.slice(data.indexOf("## "), data.indexOf("###") - data.indexOf("## ")).toString()
-                    console.log("Notebook updated!", notebookString.substr(0, 10))
+                    const dataString = data.toString()
+                    const notebookString = dataString.substr(dataString.indexOf("## ") + 3).trim()
+                    const decoded = decode_base64_to_string(notebookString)
+                    console.log("Notebook updated!", decoded.substring(0, 100))
                     // Let VSCode know the file changed
-                    this._opts?.on_filechange?.(jlfile, decode_base64_to_string(notebookString))
+                    this._opts?.on_filechange?.(jlfile, decoded)
                     return
                 }
 

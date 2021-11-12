@@ -27,7 +27,7 @@ import JSON
 using Suppressor
 
 import Pluto
-
+# We spin up Pluto from here.
 pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
 	port=port,
 	launch_browser=false,
@@ -42,13 +42,51 @@ pluto_server_session = Pluto.ServerSession(;
 	options=pluto_server_options,
 )
 
+#=  These are the function which document how we communicate, through STDIN
+# with the extension =#
+function getNextSTDINCommand()
+	new_command_str_raw = readuntil(stdin, '\0')
+	new_command_str = strip(new_command_str_raw, ['\0'])
+	JSON.parse(new_command_str)
+end
+
+function sendSTDERRCommand(name::String, payload::String)
+ 	io = IOBuffer()
+ 	io64 = Base64EncodePipe(io)
+ 	print(io64, payload)
+ 	close(io64)
+ 	@info "Command: [[Notebook=$(name)]] ## $(String(take!(io))) ###"
+end
+
+# This is the definition of type piracy
+@Base.kwdef struct PlutoExtensionSessionData
+	textRepresentations:: Dict{String, String}
+	notebooks::Dict{String, Pluto.Notebook}
+	session::Pluto.ServerSession
+	session_options::Any
+end
+
+extensionData = PlutoExtensionSessionData(Dict(), Dict(), pluto_server_session, pluto_server_options)
+
+function whenNotebookUpdates(jlfile, newString)
+	filename = splitpath(jlfile)[end]
+	sendSTDERRCommand(filename, newString)
+end
+
+# This is the definition of Type Piracy 😇
+function Pluto.save_notebook(notebook::Pluto.Notebook)
+	oldRepr = get(extensionData.textRepresentations, notebook.path, "")
+	io = IOBuffer()
+	Pluto.save_notebook(io, notebook)
+	newRepr = String(take!(io))
+	if newRepr != oldRepr
+		extensionData.textRepresentations[notebook.path] = newRepr
+		whenNotebookUpdates(notebook.path, newRepr)
+	end
+end
 
 ###
 @info "OPEN NOTEBOOK"
-
-
-
-
 
 ####
 
@@ -89,14 +127,9 @@ end
 @info "Watching Pluto folder for changes!"
 catch end
 
-# TODO: Maybe it's better to read the actual Pluto session
-filenbmap = Dict()
-ignorenextchange = false
 command_task = Pluto.@asynclog while true
-	
-	new_command_str_raw = readuntil(stdin, '\0')
-	new_command_str = strip(new_command_str_raw, ['\0'])
-	new_command = JSON.parse(new_command_str)
+	filenbmap = extensionData.notebooks
+	new_command = getNextSTDINCommand()
 	
 	@info "New command received!" new_command
 	
@@ -110,6 +143,7 @@ command_task = Pluto.@asynclog while true
 	elseif type == "open"
 		editor_html_filename = detail["editor_html_filename"]
 		jlpath = joinpath(jlfilesroot, detail["jlfile"])
+		extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
 		open(jlpath, "w") do f
 			write(f, detail["text"])
 		end
@@ -117,17 +151,18 @@ command_task = Pluto.@asynclog while true
 		filenbmap[detail["jlfile"]] = nb
 		generate_output(nb, editor_html_filename)
 	elseif type == "update"
-		global ignorenextchange = true
 		nb = filenbmap[detail["jlfile"]]
 		jlpath = joinpath(jlfilesroot, detail["jlfile"])
 		open(jlpath, "w") do f
 			write(f, detail["text"])
 		end
 		Pluto.update_from_file(pluto_server_session, nb)
+		extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
 	elseif type == "shutdown"
-		Pluto.SessionActions.shutdown(
+		nb = get(filenbmap, detail["jlfile"], nothing);
+		!isnothing(nb) && Pluto.SessionActions.shutdown(
 			pluto_server_session,
-			filenbmap.get(detail["jlfile"]);
+			nb, 
 			keep_in_session=false
 		)
 	else
@@ -142,34 +177,34 @@ messages to the VSCode extension (stderr, file update event)
 so the (possibly remote) VSCode knows that the files changed.
 Only watch 'Modified' event.
 =#
-@async try
-	BetterFileWatching.watch_folder(jlfilesroot) do event
-		if ignorenextchange
-			# this is not correct
-			global ignorenextchange = false
-			return
-		end
-
-		@info "Pluto files changed!" event
-		paths = event.paths
-		!(event isa BetterFileWatching.Modified) && return nothing
-		length(paths) !== 1 && return nothing
-		path = replace(paths[1], "/./" => "/")
-		nb_list = filter(collect(filenbmap)) do (filename, notebook)
-			occursin(filename, path) && !occursin("backup 1", path)
-		end
-		length(nb_list) === 0 && return nothing
-		nb = nb_list[1][2]
-		io = IOBuffer()
-		io64 = Base64EncodePipe(io)
-		Pluto.save_notebook(io64, nb)
-		close(io64)
-		@info "Command: [[Notebook=$(string(nb_list[1][1]))]] ## $(String(take!(io))) ###"
-	end
-catch e
-	@info "Error occured in filewatching..."
-	showerror(stderr, e, catch_backtrace())
-end
+# @async try
+# 	BetterFileWatching.watch_folder(jlfilesroot) do event
+# 		if ignorenextchange
+# 			# this is not correct
+# 			global ignorenextchange = false
+# 			return
+# 		end
+# 
+# 		@info "Pluto files changed!" event
+# 		paths = event.paths
+# 		!(event isa BetterFileWatching.Modified) && return nothing
+# 		length(paths) !== 1 && return nothing
+# 		path = replace(paths[1], "/./" => "/")
+# 		nb_list = filter(collect(filenbmap)) do (filename, notebook)
+# 			occursin(filename, path) && !occursin("backup 1", path)
+# 		end
+# 		length(nb_list) === 0 && return nothing
+# 		nb = nb_list[1][2]
+# 		io = IOBuffer()
+# 		io64 = Base64EncodePipe(io)
+# 		Pluto.save_notebook(io64, nb)
+# 		close(io64)
+# 		@info "Command: [[Notebook=$(string(nb_list[1][1]))]] ## $(String(take!(io))) ###"
+# 	end
+# catch e
+# 	@info "Error occured in filewatching..."
+# 	showerror(stderr, e, catch_backtrace())
+# end
 # { "type": "open", "detail":{"jlfile": "/home/pgeorgakopoulos/julia/pluto-vscode/julia-runtime/test.jl", "editor_html_filename": "test.html"} } ?
 
 

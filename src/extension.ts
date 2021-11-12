@@ -135,7 +135,7 @@ function new_notebook(context: vscode.ExtensionContext) {
 
                     console.log("Loading page HTML")
                     set_html("Pluto", contents)
-                }, 50)
+                }, 250)
 
                 clearInterval(handler)
             } catch (e) {
