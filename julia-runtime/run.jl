@@ -117,7 +117,7 @@ command_task = Pluto.@asynclog while true
 		filenbmap[detail["jlfile"]] = nb
 		generate_output(nb, editor_html_filename)
 	elseif type == "update"
-		ignorenextchange = true
+		global ignorenextchange = true
 		nb = filenbmap[detail["jlfile"]]
 		jlpath = joinpath(jlfilesroot, detail["jlfile"])
 		open(jlpath, "w") do f
@@ -145,16 +145,18 @@ Only watch 'Modified' event.
 @async try
 	BetterFileWatching.watch_folder(jlfilesroot) do event
 		if ignorenextchange
-			ignorenextchange = false
+			# this is not correct
+			global ignorenextchange = false
 			return
 		end
+
 		@info "Pluto files changed!" event
 		paths = event.paths
 		!(event isa BetterFileWatching.Modified) && return nothing
 		length(paths) !== 1 && return nothing
 		path = replace(paths[1], "/./" => "/")
 		nb_list = filter(collect(filenbmap)) do (filename, notebook)
-			occursin(filename, path)
+			occursin(filename, path) && !occursin("backup 1", path)
 		end
 		length(nb_list) === 0 && return nothing
 		nb = nb_list[1][2]
@@ -168,7 +170,7 @@ catch e
 	@info "Error occured in filewatching..."
 	showerror(stderr, e, catch_backtrace())
 end
-
+# { "type": "open", "detail":{"jlfile": "/home/pgeorgakopoulos/julia/pluto-vscode/julia-runtime/test.jl", "editor_html_filename": "test.html"} } ?
 
 
 ####

@@ -129,6 +129,15 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			}
 		});
 
+		const renameDocumentSubscription = vscode.workspace.onWillRenameFiles((e) => {
+			e.files.forEach(v => {
+				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
+				if (haveWV) {
+					this.webviews.changeURI(v.oldUri, v.newUri)
+				}
+			})
+		})
+
 		// onDidChangeTextDocument, 
 		// onDidDeleteFiles,
 		// onDidSaveTextDocument,
@@ -142,6 +151,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				backend.send_command("shutdown", { jlfile })
 			}
 			changeDocumentSubscription.dispose();
+			renameDocumentSubscription.dispose();
 		});
 
 		backend.ready.then(async () => {
