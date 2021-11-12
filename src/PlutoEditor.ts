@@ -217,22 +217,6 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
 		})
 	}
-
-	/**
-	 * Write out the json to a given document.
-	 */
-	private updateTextDocument(document: vscode.TextDocument, json: any) {
-		const edit = new vscode.WorkspaceEdit();
-
-		// Just replace the entire document every time for this example extension.
-		// A more complete extension should compute minimal edits instead.
-		edit.replace(
-			document.uri,
-			new vscode.Range(0, 0, document.lineCount, 0),
-			JSON.stringify(json, null, 2));
-
-		return vscode.workspace.applyEdit(edit);
-	}
 }
 
 

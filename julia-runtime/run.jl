@@ -67,12 +67,13 @@ pluto_server_session = Pluto.ServerSession(;
 	secret=secret,
 	options=pluto_server_options,
 )
+
 extensionData = PlutoExtensionSessionData(
 	Dict(),
 	Dict(),
 	pluto_server_session,
 	pluto_server_options,
-	mkpath(joinpath(asset_output_dir, "jlfiles/"))
+	joinpath(asset_output_dir, "jlfiles/")
 )
 
 function whenNotebookUpdates(jlfile, newString)
@@ -114,6 +115,7 @@ end
 
 copy_assets(force=true) = cp(Pluto.project_relative_path("frontend"), asset_output_dir; force=force)
 copy_assets()
+mkpath(extensionData.jlfilesroot)
 
 try ## Note: This is to assist with co-developing Pluto & this Extension
 	## In a production setting it's not necessary to watch pluto folder for updates
