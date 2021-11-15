@@ -30,6 +30,12 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 	private static readonly viewType = 'plutoView';
 	private readonly pluto_asset_dir = join(tmpdir(), getNonce())
 	private readonly webviews = new WebviewCollection();
+	private static readonly statusbar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
+
+	public renderStatusBar () {
+		PlutoEditor.statusbar.text = `Pluto: ${this.webviews.notebooksRunning()} 📒`
+		PlutoEditor.statusbar.show()
+	}
 
 	constructor(
 		private readonly context: vscode.ExtensionContext
@@ -57,6 +63,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const jlfile = `editor_bespoke_${uuidv4}.jl`
 
 		this.webviews.add(document, uuidv4, webviewPanel);
+		this.renderStatusBar()
 		webviewPanel.webview.html = LOADING_HTML;
 
 		let disposed: boolean = false
@@ -67,8 +74,8 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			webviewPanel.webview.html = contents
 		}
 
-		const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
-		const backend = PlutoBackend.create(this.context, statusBarItem, {
+		
+		const backend = PlutoBackend.create(this.context, PlutoEditor.statusbar, {
 			pluto_asset_dir: this.pluto_asset_dir,
 			/**
 			 * VERY important implementation detail:
@@ -106,8 +113,9 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 					} catch (err) {
 						console.log("Concurrently changed document - trying again in 500ms", err)
 						setTimeout(() => vscode.workspace.applyEdit(edit), 500)
-					}
+					}	
 				}
+				this.renderStatusBar()
 			},
 			vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(this.pluto_asset_dir)),
 			pluto_config: {
@@ -128,6 +136,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				// When VSCode updates the document, notify pluto from here	
 				backend.send_command("update", { jlfile, text: doc.getText() })
 			}
+			this.renderStatusBar()
 		});
 
 		const renameDocumentSubscription = vscode.workspace.onWillRenameFiles((e) => {
@@ -138,6 +147,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 					this.webviews.shutdownProtect(v.newUri, "on")
 				}
 			})
+			this.renderStatusBar()
 		})
 
 		const afterRenameDocumentSubscription = vscode.workspace.onDidRenameFiles((e) => {
@@ -148,6 +158,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 					this.webviews.shutdownProtect(v.newUri, "off")
 				}
 			})
+			this.renderStatusBar()
 		})
 
 		// This should be handled by the last disposal anyway
@@ -158,6 +169,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 					this.webviews.shutdownProtect(uri, "off")
 				}
 			})
+			this.renderStatusBar()
 		})
 
 
@@ -169,13 +181,15 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// Make sure we get rid of the listener when our editor is closed.
 		webviewPanel.onDidDispose(() => {
 			disposed = true
-			const others = Array.from(this.webviews.get(document.uri)).filter(c => c.webviewPanel !== webviewPanel)
 			if (this.webviews.canShutdown(document.uri)) {
 				backend.send_command("shutdown", { jlfile })
 			}
+			this.webviews.remove(document.uri);
 			changeDocumentSubscription.dispose();
 			renameDocumentSubscription.dispose();
 			afterRenameDocumentSubscription.dispose();
+			willDeleteDocumentSubscription.dispose();
+			this.renderStatusBar();
 		});
 
 		backend.ready.then(async () => {
@@ -247,10 +261,17 @@ class WebviewCollection {
 		readonly uri: vscode.Uri;
 		readonly webviewPanel: vscode.WebviewPanel;
 	}>();
+
 	private readonly _protect = new Set<{
 		readonly uri: vscode.Uri
 	}>();
 
+	public notebooksRunning(){
+		return new Set(Array.from(this._webviews.values()).map(({uuidv4}) => uuidv4)).size
+	}
+	public size() {
+		return this._webviews.size
+	}
 	/**
 	 * VSCode disposes webviews when renaming.
 	 * Let's prevent the disposal to also shutdown the
