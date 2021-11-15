@@ -133,7 +133,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const renameDocumentSubscription = vscode.workspace.onWillRenameFiles((e) => {
 			e.files.forEach(v => {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
-				if (haveWV) {
+				if (haveWV && document.uri === v.oldUri) {
 					this.webviews.changeURI(v.oldUri, v.newUri)
 					this.webviews.shutdownProtect(v.newUri, "on")
 				}
@@ -143,7 +143,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const afterRenameDocumentSubscription = vscode.workspace.onDidRenameFiles((e) => {
 			e.files.forEach(v => {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
-				if (haveWV) {
+				if (haveWV && document.uri === v.oldUri) {
 					this.webviews.changeURI(v.oldUri, v.newUri)
 					this.webviews.shutdownProtect(v.newUri, "off")
 				}
