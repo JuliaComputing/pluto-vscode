@@ -150,6 +150,16 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			})
 		})
 
+		// This should be handled by the last disposal anyway
+		const willDeleteDocumentSubscription = vscode.workspace.onWillDeleteFiles((e) => {
+			e.files.forEach(uri => {
+				const haveWV = Array.from(this.webviews.get(uri)).length !== 0
+				if (haveWV && document.uri === uri) {
+					this.webviews.shutdownProtect(uri, "off")
+				}
+			})
+		})
+
 
 		// onDidChangeTextDocument, 
 		// onDidDeleteFiles,
