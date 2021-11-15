@@ -184,7 +184,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			if (this.webviews.canShutdown(document.uri)) {
 				backend.send_command("shutdown", { jlfile })
 			}
-			this.webviews.remove(document.uri);
+			this.webviews.remove(webviewPanel);
 			changeDocumentSubscription.dispose();
 			renameDocumentSubscription.dispose();
 			afterRenameDocumentSubscription.dispose();
@@ -336,12 +336,11 @@ class WebviewCollection {
 	}
 
 	/**
-	 * Remove all webviews that are associated with this URI.
+	 * Remove the specific (===) webpanel view from the Webview Collection.
 	 */
-	public remove(uri: vscode.Uri) {
-		const key = uri.toString()
+	public remove(webviewPanel: vscode.WebviewPanel) {
 		for (const entry of this._webviews) {
-			if (entry.resource === key) {
+			if (entry.webviewPanel === webviewPanel) {
 				this._webviews.delete(entry);
 			}
 		}
