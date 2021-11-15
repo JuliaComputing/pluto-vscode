@@ -135,9 +135,21 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
 				if (haveWV) {
 					this.webviews.changeURI(v.oldUri, v.newUri)
+					this.webviews.shutdownProtect(v.newUri, "on")
 				}
 			})
 		})
+
+		const afterRenameDocumentSubscription = vscode.workspace.onDidRenameFiles((e) => {
+			e.files.forEach(v => {
+				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
+				if (haveWV) {
+					this.webviews.changeURI(v.oldUri, v.newUri)
+					this.webviews.shutdownProtect(v.newUri, "off")
+				}
+			})
+		})
+
 
 		// onDidChangeTextDocument, 
 		// onDidDeleteFiles,
@@ -148,19 +160,17 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		webviewPanel.onDidDispose(() => {
 			disposed = true
 			const others = Array.from(this.webviews.get(document.uri)).filter(c => c.webviewPanel !== webviewPanel)
-			if (others.length === 0) {
+			if (this.webviews.canShutdown(document.uri)) {
 				backend.send_command("shutdown", { jlfile })
 			}
 			changeDocumentSubscription.dispose();
 			renameDocumentSubscription.dispose();
+			afterRenameDocumentSubscription.dispose();
 		});
 
 		backend.ready.then(async () => {
-			// TODO: Something with the document's URI here. Same files should get the same html.
-			// TODO: Use the same file for the same URI. 
-			// TODO: Sync file??
 			const text = document.getText()
-			// Send a command to open the file only if there exist
+			// Send a command to open the file only if there is not a file yet.
 			if (!hasMoreWebviews)
 				backend.send_command("open", {
 					editor_html_filename,
@@ -170,13 +180,11 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 						// disable_ui: true,
 					},
 				})
-			else
-				console.log("Second UI reusing existing connection!")
 			const handler = setInterval(() => {
 				try {
-					console.log("checking file existence!")
+					// console.log("checking file existence!")
 					accessSync(join(this.pluto_asset_dir, editor_html_filename))
-					console.log("file exists!")
+					// console.log("file exists!")
 
 					setTimeout(async () => {
 						const contents = readFileSync(join(this.pluto_asset_dir, editor_html_filename), {
@@ -229,7 +237,29 @@ class WebviewCollection {
 		readonly uri: vscode.Uri;
 		readonly webviewPanel: vscode.WebviewPanel;
 	}>();
+	private readonly _protect = new Set<{
+		readonly uri: vscode.Uri
+	}>();
 
+	/**
+	 * VSCode disposes webviews when renaming.
+	 * Let's prevent the disposal to also shutdown the
+	 * pluto instance of the notebook
+	 * */
+	public shutdownProtect(uri: vscode.Uri, status: "on" | "off"){
+		if(status === "on"){
+			return this._protect.add({uri}) 
+		}
+		if(this._protect.has({uri})){
+			return this._protect.delete({uri})
+		}
+	}
+
+	public canShutdown(uri: vscode.Uri) {
+		const isprotected = this._protect.has({uri})
+		const onlyoneleft = Array.from(this.get(uri)).length === 1
+		return !isprotected && onlyoneleft
+	}
 	/**
 	 * Get all known webviews for a given uri.
 	 */
