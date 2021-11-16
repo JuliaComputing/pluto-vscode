@@ -22,9 +22,11 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 	private static readonly viewType = 'plutoView';
 	private readonly pluto_asset_dir = join(tmpdir(), getNonce())
 	private readonly webviews = new WebviewCollection();
+	private readonly uriToUUIDMap = new Map <vscode.Uri, string>();
+
 	private static readonly statusbar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 
-	public renderStatusBar () {
+	public renderStatusBar() {
 		PlutoEditor.statusbar.text = `Pluto: ${this.webviews.notebooksRunning()} 📒`
 		PlutoEditor.statusbar.show()
 	}
@@ -49,8 +51,11 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
 		const currentWebviews = Array.from(this.webviews.get(document.uri))
 		const hasMoreWebviews = currentWebviews.length !== 0
-		// Get this only once per user's file
-		const uuidv4 = hasMoreWebviews ? currentWebviews[0].uuidv4 : v4()
+		// Get this only once per user's file - UPDATE: presist UUID per URI
+		const uuidv4 = this.uriToUUIDMap.has(document.uri) ? this.uriToUUIDMap.get(document.uri) || v4() : v4()
+
+		this.uriToUUIDMap.set(document.uri, uuidv4)
+
 		const editor_html_filename = `editor_bespoke_${uuidv4}.html`
 		const jlfile = `editor_bespoke_${uuidv4}.jl`
 
@@ -66,7 +71,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			webviewPanel.webview.html = contents
 		}
 
-		
+
 		const backend = PlutoBackend.create(this.context, PlutoEditor.statusbar, {
 			pluto_asset_dir: this.pluto_asset_dir,
 			/**
@@ -105,7 +110,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 					} catch (err) {
 						console.log("Concurrently changed document - trying again in 500ms", err)
 						setTimeout(() => vscode.workspace.applyEdit(edit), 500)
-					}	
+					}
 				}
 				this.renderStatusBar()
 			},
@@ -136,6 +141,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
 				if (haveWV && document.uri === v.oldUri) {
 					this.webviews.changeURI(v.oldUri, v.newUri)
+					this.uriToUUIDMap.set(v.newUri, this.uriToUUIDMap.get(v.oldUri) ?? "")
 					this.webviews.shutdownProtect(v.newUri, "on")
 				}
 			})
@@ -147,6 +153,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
 				if (haveWV && document.uri === v.oldUri) {
 					this.webviews.changeURI(v.oldUri, v.newUri)
+					this.uriToUUIDMap.delete(v.oldUri)
 					this.webviews.shutdownProtect(v.newUri, "off")
 				}
 			})
@@ -173,8 +180,16 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// Make sure we get rid of the listener when our editor is closed.
 		webviewPanel.onDidDispose(() => {
 			disposed = true
-			if (this.webviews.canShutdown(document.uri)) {
-				backend.send_command("shutdown", { jlfile })
+			if (this.webviews.canShutdown(document.uri, 1)) {
+				const curi = document.uri
+				setTimeout(() => {
+					// Shutdown 10 seconds after last editor closes
+					// This covers many cases where a view is disposed
+					// And another is created immediately
+					// OR the user closes notebook by mistake.
+					if (this.webviews.canShutdown(curi, 0))
+						backend.send_command("shutdown", { jlfile })
+				}, 10000)
 			}
 			this.webviews.remove(webviewPanel);
 			changeDocumentSubscription.dispose();
@@ -258,8 +273,8 @@ class WebviewCollection {
 		readonly uri: vscode.Uri
 	}>();
 
-	public notebooksRunning(){
-		return new Set(Array.from(this._webviews.values()).map(({uuidv4}) => uuidv4)).size
+	public notebooksRunning() {
+		return new Set(Array.from(this._webviews.values()).map(({ uuidv4 }) => uuidv4)).size
 	}
 	public size() {
 		return this._webviews.size
@@ -269,19 +284,19 @@ class WebviewCollection {
 	 * Let's prevent the disposal to also shutdown the
 	 * pluto instance of the notebook
 	 * */
-	public shutdownProtect(uri: vscode.Uri, status: "on" | "off"){
-		if(status === "on"){
-			return this._protect.add({uri}) 
+	public shutdownProtect(uri: vscode.Uri, status: "on" | "off") {
+		if (status === "on") {
+			return this._protect.add({ uri })
 		}
-		if(this._protect.has({uri})){
-			return this._protect.delete({uri})
+		if (this._protect.has({ uri })) {
+			return this._protect.delete({ uri })
 		}
 	}
 
-	public canShutdown(uri: vscode.Uri) {
-		const isprotected = this._protect.has({uri})
-		const onlyoneleft = Array.from(this.get(uri)).length === 1
-		return !isprotected && onlyoneleft
+	public canShutdown(uri: vscode.Uri, musthavetoshutdown = 1) {
+		const isprotected = this._protect.has({ uri })
+		const onlyXleft = Array.from(this.get(uri)).length === musthavetoshutdown
+		return !isprotected && onlyXleft
 	}
 	/**
 	 * Get all known webviews for a given uri.

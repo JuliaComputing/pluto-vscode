@@ -8,6 +8,7 @@ import { create_proxy } from "./ws-proxy"
 import { PlutoEditor } from "./PlutoEditor"
 
 export function activate(context: vscode.ExtensionContext) {
+    context.subscriptions.push(PlutoEditor.register(context));
     context.subscriptions.push(
         vscode.commands.registerCommand("plutoView.start", () => {
             vscode.commands.executeCommand('vscode.openWith',
@@ -23,7 +24,6 @@ export function activate(context: vscode.ExtensionContext) {
             )
         })
     )
-    context.subscriptions.push(PlutoEditor.register(context));
 }
 
 export function getWebviewOptions(extensionUri: vscode.Uri, pluto_asset_dir: string): vscode.WebviewOptions {
