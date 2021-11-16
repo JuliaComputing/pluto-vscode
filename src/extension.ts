@@ -10,7 +10,10 @@ import { PlutoEditor } from "./PlutoEditor"
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand("plutoView.start", () => {
-            new_notebook(context)
+            vscode.commands.executeCommand('vscode.openWith',
+                vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, 'new notebook.jl'),
+                'plutoView');
+            // new_notebook(context)
         })
     )
     context.subscriptions.push(PlutoEditor.register(context));

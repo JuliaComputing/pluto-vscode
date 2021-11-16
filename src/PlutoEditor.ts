@@ -8,16 +8,8 @@ import { getWebviewOptions, getNonce, LOADING_HTML } from './extension';
 import { create_proxy } from './ws-proxy';
 
 /**
- * Provider for cat scratch editors.
+ * Provider for Pluto editors.
  * 
- * Cat scratch editors are used for `.cscratch` files, which are just json files.
- * To get started, run this extension and open an empty `.cscratch` file in VS Code.
- * 
- * This provider demonstrates:
- * 
- * - Setting up the initial webview for a custom editor.
- * - Loading scripts and styles in a custom editor.
- * - Synchronizing changes between a text document and a custom editor.
  */
 export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
