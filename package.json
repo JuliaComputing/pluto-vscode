@@ -25,7 +25,12 @@
         "commands": [
             {
                 "command": "plutoView.start",
-                "title": "Start new notebook",
+                "title": "Start a Pluto.jl notebook",
+                "category": "Pluto"
+            },
+            {
+                "command": "plutoView.openExistingWith",
+                "title": "Open with Pluto.jl",
                 "category": "Pluto"
             }
         ],
@@ -40,7 +45,23 @@
                 ],
                 "priority": "option"
             }
-        ]
+        ],
+        "menus": {
+            "editor/title/context": [
+                {
+                    "when": "resourceLangId == julia",
+                    "command": "plutoView.openExistingWith",
+                    "group": "3_preview@3"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "when": "resourceLangId == julia",
+                    "command": "plutoView.openExistingWith",
+                    "group": "navigation@4"
+                }
+            ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",

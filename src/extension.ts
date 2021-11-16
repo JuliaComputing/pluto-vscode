@@ -14,6 +14,13 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, 'new notebook.jl'),
                 'plutoView');
             // new_notebook(context)
+        }))
+    context.subscriptions.push(
+        vscode.commands.registerCommand("plutoView.openExistingWith", (selectedDocumentURI) => {
+            vscode.commands.executeCommand('vscode.openWith',
+                selectedDocumentURI,
+                'plutoView'
+            )
         })
     )
     context.subscriptions.push(PlutoEditor.register(context));
