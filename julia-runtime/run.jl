@@ -25,6 +25,7 @@ Pkg.instantiate()
 
 import JSON
 using Suppressor
+using UUIDs
 
 import Pluto
 
@@ -145,8 +146,9 @@ command_task = Pluto.@asynclog while true
 	
 	if type == "new"
 		editor_html_filename = detail["editor_html_filename"]
-		nb = Pluto.SessionActions.new(pluto_server_session)
+		nb = Pluto.SessionActions.new(pluto_server_session; notebook_id=UUID(detail["notebook_id"]))
 		generate_output(nb, editor_html_filename)
+		
 	elseif type == "open"
 		editor_html_filename = detail["editor_html_filename"]
 		jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
@@ -154,9 +156,10 @@ command_task = Pluto.@asynclog while true
 		open(jlpath, "w") do f
 			write(f, detail["text"])
 		end
-		nb = Pluto.SessionActions.open(pluto_server_session, jlpath)
+		nb = Pluto.SessionActions.open(pluto_server_session, jlpath; notebook_id=UUID(detail["notebook_id"]))
 		filenbmap[detail["jlfile"]] = nb
 		generate_output(nb, editor_html_filename)
+		
 	elseif type == "update"
 		nb = filenbmap[detail["jlfile"]]
 		jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
@@ -165,6 +168,7 @@ command_task = Pluto.@asynclog while true
 		end
 		Pluto.update_from_file(pluto_server_session, nb)
 		extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
+		
 	elseif type == "shutdown"
 		nb = get(filenbmap, detail["jlfile"], nothing);
 		!isnothing(nb) && Pluto.SessionActions.shutdown(
@@ -172,6 +176,7 @@ command_task = Pluto.@asynclog while true
 			nb, 
 			keep_in_session=false
 		)
+		
 	else
 		@error "Message of this type not recognised. " type
 	end

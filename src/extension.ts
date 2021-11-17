@@ -56,7 +56,7 @@ export const LOADING_HTML = `<!DOCTYPE html>
     <head>
         <title>Loading...</title>
     </head>
-    <body style="margin: 0px; padding: 0px; overflow: hidden; background: white;">
+    <body style="margin: 0px; padding: 0px; overflow: hidden; background: white; color: #111;">
         <h1>Loading...</h1>
     </body>
     </html>
@@ -128,6 +128,7 @@ function new_notebook(context: vscode.ExtensionContext) {
 
     backend.ready.then(async () => {
         //
+        const notebook_id = uuid()
         /**
          * I made up a cool term: ***bespoke editor***.
          *
@@ -163,11 +164,12 @@ function new_notebook(context: vscode.ExtensionContext) {
          *
          * (🙋 FYI: This is done using the `pluto_cdn_root` setting, which we also used in normal Pluto to generate HTML files that get our assets from `cdn.jsdelivr.net`.)
          *
-         * The filename is random, it just happens to contain a UUID but that is not the notebook ID. 💕
+         * To keep things simple, the UUID in the filename also the `notebook_id` used by Pluto. 💕
          */
-        const editor_html_filename = `editor_bespoke_${uuid()}.html`
+        const editor_html_filename = `editor_bespoke_${notebook_id}.html`
         await backend.send_command("new", {
             editor_html_filename,
+            notebook_id,
             frontend_params: {
                 // disable_ui: true,
             },

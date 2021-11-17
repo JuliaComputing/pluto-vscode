@@ -1,7 +1,7 @@
 import { accessSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { v4 } from 'uuid';
+import { v4 as uuid } from 'uuid';
 import * as vscode from 'vscode';
 import { PlutoBackend } from './backend';
 import { getWebviewOptions, LOADING_HTML } from './extension';
@@ -20,9 +20,9 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 	}
 
 	private static readonly viewType = 'plutoView';
-	private readonly pluto_asset_dir = join(tmpdir(), v4())
+	private readonly pluto_asset_dir = join(tmpdir(), uuid())
 	private readonly webviews = new WebviewCollection();
-	private readonly uriToUUIDMap = new Map <vscode.Uri, string>();
+	private readonly uri_to_notebook_id_map = new Map <vscode.Uri, string>();
 
 	private static readonly statusbar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 
@@ -52,14 +52,14 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const currentWebviews = Array.from(this.webviews.get(document.uri))
 		const hasMoreWebviews = currentWebviews.length !== 0
 		// Get this only once per user's file - UPDATE: persist UUID per URI
-		const uuidv4 = this.uriToUUIDMap.has(document.uri) ? this.uriToUUIDMap.get(document.uri) || v4() : v4()
+		const notebook_id = this.uri_to_notebook_id_map.get(document.uri) ?? uuid()
 
-		this.uriToUUIDMap.set(document.uri, uuidv4)
+		this.uri_to_notebook_id_map.set(document.uri, notebook_id)
 
-		const editor_html_filename = `editor_bespoke_${uuidv4}.html`
-		const jlfile = `editor_bespoke_${uuidv4}.jl`
+		const editor_html_filename = `editor_bespoke_${notebook_id}.html`
+		const jlfile = `editor_bespoke_${notebook_id}.jl`
 
-		this.webviews.add(document, uuidv4, webviewPanel);
+		this.webviews.add(document, notebook_id, webviewPanel);
 		this.renderStatusBar()
 		webviewPanel.webview.html = LOADING_HTML;
 
@@ -82,7 +82,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			 * That means, the code must *not* create closures around the
 			 * initial context because subsequent webviews do not apply.
 			 * 
-			 * we use this.webviews.getByUUID for this exact reason.
+			 * we use this.webviews.getByNotebookID for this exact reason.
 			 * 
 			 */
 			on_filechange: (file: string, f: string) => {
@@ -91,8 +91,8 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				// 2. Serialize
 				// 3. Make more minimal changes (even though Pluto doesn't!)
 				//
-				const uuidv4 = file.replace("editor_bespoke_", "").replace(".jl", "")
-				const webviewsForFile = Array.from(this.webviews.getByUUID(uuidv4))
+				const notebook_id = file.replace("editor_bespoke_", "").replace(".jl", "")
+				const webviewsForFile = Array.from(this.webviews.getByNotebookID(notebook_id))
 				if (webviewsForFile.length === 0) {
 					return
 				}
@@ -140,7 +140,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
 				if (haveWV && document.uri === v.oldUri) {
 					this.webviews.changeURI(v.oldUri, v.newUri)
-					this.uriToUUIDMap.set(v.newUri, this.uriToUUIDMap.get(v.oldUri) ?? "")
+					this.uri_to_notebook_id_map.set(v.newUri, this.uri_to_notebook_id_map.get(v.oldUri) ?? "")
 					this.webviews.shutdownProtect(v.newUri, "on")
 				}
 			})
@@ -152,7 +152,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
 				if (haveWV && document.uri === v.oldUri) {
 					this.webviews.changeURI(v.oldUri, v.newUri)
-					this.uriToUUIDMap.delete(v.oldUri)
+					this.uri_to_notebook_id_map.delete(v.oldUri)
 					this.webviews.shutdownProtect(v.newUri, "off")
 				}
 			})
@@ -204,6 +204,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			if (!hasMoreWebviews)
 				backend.send_command("open", {
 					editor_html_filename,
+					notebook_id,
 					text,
 					jlfile,
 					frontend_params: {
@@ -263,7 +264,7 @@ class WebviewCollection {
 	private readonly _webviews = new Set<{
 		readonly document: vscode.TextDocument;
 		readonly resource: string;
-		readonly uuidv4: string;
+		readonly notebook_id: string;
 		readonly uri: vscode.Uri;
 		readonly webviewPanel: vscode.WebviewPanel;
 	}>();
@@ -273,7 +274,7 @@ class WebviewCollection {
 	}>();
 
 	public notebooksRunning() {
-		return new Set(Array.from(this._webviews.values()).map(({ uuidv4 }) => uuidv4)).size
+		return new Set(Array.from(this._webviews.values()).map(({ notebook_id }) => notebook_id)).size
 	}
 	public size() {
 		return this._webviews.size
@@ -304,7 +305,7 @@ class WebviewCollection {
 		readonly document: vscode.TextDocument;
 		readonly resource: string;
 		readonly uri: vscode.Uri;
-		readonly uuidv4: string;
+		readonly notebook_id: string;
 		readonly webviewPanel: vscode.WebviewPanel;
 	}> {
 		const key = uri.toString();
@@ -315,16 +316,16 @@ class WebviewCollection {
 		}
 	}
 
-	public *getByUUID(uuid: string): Iterable<{
+	public *getByNotebookID(notebook_id: string): Iterable<{
 		readonly document: vscode.TextDocument;
 		readonly resource: string;
-		readonly uuidv4: string;
+		readonly notebook_id: string;
 		readonly uri: vscode.Uri;
 		readonly webviewPanel: vscode.WebviewPanel;
 	}> {
-		const key = uuid;
+		const key = notebook_id;
 		for (const entry of this._webviews) {
-			if (entry.uuidv4 === key) {
+			if (entry.notebook_id === key) {
 				yield entry;
 			}
 		}
@@ -332,8 +333,8 @@ class WebviewCollection {
 	/**
 	 * Add a new webview to the collection.
 	 */
-	public add(document: vscode.TextDocument, uuidv4: string, webviewPanel: vscode.WebviewPanel) {
-		const entry = { document, resource: document.uri.toString(), uuidv4, uri: document.uri, webviewPanel };
+	public add(document: vscode.TextDocument, notebook_id: string, webviewPanel: vscode.WebviewPanel) {
+		const entry = { document, resource: document.uri.toString(), notebook_id, uri: document.uri, webviewPanel };
 		this._webviews.add(entry);
 
 		webviewPanel.onDidDispose(() => {
@@ -357,7 +358,7 @@ class WebviewCollection {
 		for (const entry of this._webviews) {
 			if (entry.resource === key) {
 				this._webviews.delete(entry);
-				const newentry = { document: entry.document, resource: newUri.toString(), uri: entry.uri, uuidv4: entry.uuidv4, webviewPanel: entry.webviewPanel };
+				const newentry = { document: entry.document, resource: newUri.toString(), uri: entry.uri, notebook_id: entry.notebook_id, webviewPanel: entry.webviewPanel };
 				this._webviews.add(newentry)
 			}
 		}
