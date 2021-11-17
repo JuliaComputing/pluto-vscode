@@ -4,7 +4,7 @@ import { join } from 'path';
 import { v4 } from 'uuid';
 import * as vscode from 'vscode';
 import { PlutoBackend } from './backend';
-import { getWebviewOptions, getNonce, LOADING_HTML } from './extension';
+import { getWebviewOptions, LOADING_HTML } from './extension';
 import { create_proxy } from './ws-proxy';
 
 /**
@@ -20,7 +20,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 	}
 
 	private static readonly viewType = 'plutoView';
-	private readonly pluto_asset_dir = join(tmpdir(), getNonce())
+	private readonly pluto_asset_dir = join(tmpdir(), v4())
 	private readonly webviews = new WebviewCollection();
 	private readonly uriToUUIDMap = new Map <vscode.Uri, string>();
 
@@ -72,7 +72,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		}
 
 
-		const backend = PlutoBackend.create(this.context, PlutoEditor.statusbar, {
+		const backend = PlutoBackend.create_async(this.context, PlutoEditor.statusbar, {
 			pluto_asset_dir: this.pluto_asset_dir,
 			/**
 			 * VERY important implementation detail:
