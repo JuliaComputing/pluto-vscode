@@ -51,7 +51,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
 		const currentWebviews = Array.from(this.webviews.get(document.uri))
 		const hasMoreWebviews = currentWebviews.length !== 0
-		// Get this only once per user's file - UPDATE: presist UUID per URI
+		// Get this only once per user's file - UPDATE: persist UUID per URI
 		const uuidv4 = this.uriToUUIDMap.has(document.uri) ? this.uriToUUIDMap.get(document.uri) || v4() : v4()
 
 		this.uriToUUIDMap.set(document.uri, uuidv4)
@@ -127,7 +127,6 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// 
 		// Remember that a single text document can also be shared between multiple custom
 		// editors (this happens for example when you split a custom editor)
-
 		const changeDocumentSubscription = vscode.workspace.onDidSaveTextDocument(doc => {
 			if (doc.uri.toString() === document.uri.toString()) {
 				// When VSCode updates the document, notify pluto from here	

@@ -12,11 +12,14 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand("plutoView.start", () => {
             vscode.commands.executeCommand('vscode.openWith',
+
+            // TODO: This currently fails because new notebook doesn't exist
                 vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, 'new notebook.jl'),
                 'plutoView');
             // new_notebook(context)
         }))
     context.subscriptions.push(
+        // TODO: This only works if a backend already exists. TODO: spin out a backend on activate!
         vscode.commands.registerCommand("plutoView.openExistingWith", (selectedDocumentURI) => {
             vscode.commands.executeCommand('vscode.openWith',
                 selectedDocumentURI,
