@@ -11,30 +11,14 @@ type BackendOpts = {
     pluto_asset_dir: string
     vscode_proxy_root: vscode.Uri
     on_filechange: Function
+    /** These properties correspond to keyword arguments to `Pluto.run`. e.g. `{ workspace_use_distributed: false, auto_reload_from_file: true }` */
     pluto_config?: Object
 }
-const get_julia_command = async (): Promise<string> => {
-    const julia_extension = vscode.extensions.getExtension("julialang.language-julia")
 
-    if (julia_extension) {
-        if (![3, 4].includes(julia_extension.exports.version)) {
-            console.error("Not compatible with this version of the julia extension :(")
-        }
-        try {
-            let result = await julia_extension.exports.getJuliaPath()
-            console.warn({ result })
-            return result
-        } catch (e) {
-            console.error("Failed to get Julia launch command from Julia extension :(", e)
-        }
-    }
-    console.error("Fallback: using `julia` command to launch julia.")
-    return "julia"
-}
-
+/** This code launches the Pluto runner (julia-runtime/run.jl) and keeps a connection with it. Communication happens over stdin/stdout, with JSON. You can use `send_command` to say something to the Pluto runner. */
 export class PlutoBackend {
     private static _instance: PlutoBackend | null = null
-    public static create(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
+    public static create_async(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
         if (PlutoBackend._instance) {
             return PlutoBackend._instance
         }
@@ -52,6 +36,10 @@ export class PlutoBackend {
         return !!PlutoBackend._instance
     }
 
+    /** Send a command to the Pluto runner. This should be a message type (`string`) together with any JSON-serializable object for the message body.
+     *
+     * It is sent over stdout/stdin, and handled by `julia-runtime/run.jl`.
+     */
     public send_command(type: string, detail: Object = {}) {
         this._process!.stdin!.write(
             JSON.stringify({
@@ -83,7 +71,7 @@ export class PlutoBackend {
         // find a free port, some random sampling to make collisions less likely
         this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23047)
 
-        let resolve_ready = (x: boolean) => { }
+        let resolve_ready = (x: boolean) => {}
         this.ready = new Promise<boolean>((r) => {
             resolve_ready = r
         })
@@ -110,7 +98,10 @@ export class PlutoBackend {
                 const text = data.slice(0, data.length - 1)
                 // TODO: Generalize this for more message types to be added
                 if (text.includes("Command: [[Notebook=")) {
-                    const jlfile = data.slice(data.indexOf("=") + 1, data.indexOf("]]")).toString().trim()
+                    const jlfile = data
+                        .slice(data.indexOf("=") + 1, data.indexOf("]]"))
+                        .toString()
+                        .trim()
                     console.log("jlfile", jlfile)
                     const dataString = data.toString()
                     const notebookString = dataString.substr(dataString.indexOf("## ") + 3).trim()
@@ -141,4 +132,24 @@ export class PlutoBackend {
         this._status.text = "Pluto: killing..."
         this._status.show()
     }
+}
+
+/** Get the command to launch Julia. We try to get it from the `julia-vscode` extension if possible. */
+const get_julia_command = async (): Promise<string> => {
+    const julia_extension = vscode.extensions.getExtension("julialang.language-julia")
+
+    if (julia_extension) {
+        if (![3, 4].includes(julia_extension.exports.version)) {
+            console.error("Not compatible with this version of the julia extension :(")
+        }
+        try {
+            let result = await julia_extension.exports.getJuliaPath()
+            console.warn({ result })
+            return result
+        } catch (e) {
+            console.error("Failed to get Julia launch command from Julia extension :(", e)
+        }
+    }
+    console.error("Fallback: using `julia` command to launch julia.")
+    return "julia"
 }

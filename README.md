@@ -35,7 +35,7 @@ If you just want to **run** the extension:
 Inside the VS Code editor running the extension:
 
 1. `Cmd+Shift+P` and run `Pluto: Start new notebook`
-8. While waiting (max 60 seconds), `Cmd+Shift+P` and run `Developer: Open WebView Developer Tools`
+8. While waiting (max 60 seconds), `Cmd+Shift+P` and run `Developer: Open Webview Developer Tools`
 
 ---
 
@@ -43,3 +43,34 @@ To generate the `.vsix` file:
 1. Install `vsce`
 1. `npm install --include=dev`
 1. `vsce package`
+
+
+# How it works
+
+This extension runs the normal Pluto server, and we use a *VS Code Webview* to display the (mostly) normal Pluto frontend inside VS Code! 
+
+> 🙋 You should read https://code.visualstudio.com/api/extension-guides/webview before working on this extension.
+
+The main differences between using `pluto-vscode` and using Pluto the normal way are:
+- This extension will (install and) **launch Pluto for you**. It will use the `julia-vscode` extension to get the Julia executable, which means that the entire process until you see the notebook is handled by the extension.
+- Normally, the Pluto server opens a **websocket** connection with every client. In the VS Code setup, we use the **proxy provided by VS Code** instead, so that we don't have to set up proxies and tunnels for our WS connection. This gives us all the benefits of the VS Code philosophy: we write the extension once using VS Code API, and then VS Code lets people run it locally, over SSH, on github.dev, on JuliaHub, and more!
+- (Future) Notebook **file management is handled by the VS Code extension**, not by Pluto's UI. This means that people use the file manager and file GUI that comes with VS Code to manage notebook files. Again, this has the benefit that it will automatically work on all ways that VS Code works. 
+
+## The proxy
+
+There are 4 types of players in the pluto-vscode dance:
+
+- **The Pluto frontends**: These are running inside webviews, viewing and editing notebooks. They use VS Code API to connect with the extension. Running in ES2020 browser, source code is https://github.com/fonsp/Pluto.jl/pull/1493
+
+- **The extension**: This handles communication between all the other players, and talks with VS Code. Running in silly Node.js, source code is all `.ts` files in `src/`.
+
+- **The Pluto runner**: A small script that imports Pluto and runs it. It also listens to `stdin` for instructions coming from the extension, to open/stop notebooks and to generate files. Running in beautiful but slow Julia, source code is in `julia-runtime/run.jl`.
+
+- **The Pluto server**: This is the normal Pluto backend, mostly unchanged, ran by our runner. It runs a websocket server, it thinks that it is talking to the browser, but it is actually going through our extension! Running in why-does-it-not-run-in-wasm-Julia, source code is https://github.com/fonsp/Pluto.jl/pull/1493
+
+
+Now, the extension (running in Node.js) is *pretending* to be a browser-based Pluto client, talking over WS with the Pluto server. We just copied the WS client code from Pluto into the extension (and converted it to work inside Node.js 😑), this is `src/julia-ws-connection.ts`. 
+
+All the messages that it receives are passed along to the actual frontends, running inside webview. Conversely, any messages from the webview are passed along to the Pluto server by the extension.
+
+Communication between extension and Pluto server happens with the normal WebSocket code from Pluto (which works, because the extension and the Pluto server are always running on the same computer), communication between extension and webviews happens with [official VS Code API: `Webview.postMessage` and `Webview.onDidReceiveMessage`](https://code.visualstudio.com/api/references/vscode-api#Webview).

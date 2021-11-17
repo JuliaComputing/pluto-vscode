@@ -8,6 +8,8 @@ Original: https://github.com/fonsp/Pluto.jl/blob/v0.16.4/frontend/common/PlutoCo
 
 It sets up and maintains a WS connection with the Pluto server. 
 
+YOU SHOULD NOT have to make changes to this, unless you are a Pluto dev and you have worked with our WebSocket stuff before.
+
 */
 
 import WebSocket from "ws"

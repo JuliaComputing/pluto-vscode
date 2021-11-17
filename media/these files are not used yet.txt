@@ -1,0 +1,3 @@
+
+
+But i am keeping them in case we want to show VS Code-specific UI inside the webview in the future, like a nicer looking loading page.
