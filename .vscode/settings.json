@@ -5,5 +5,8 @@
     "prettier.tabWidth": 4,
     "prettier.semi": false,
     "prettier.quoteProps": "consistent",
-    "prettier.singleQuote": false
+    "prettier.singleQuote": false,
+    "[julia]": {
+        "editor.formatOnSave": false
+    }
 }
