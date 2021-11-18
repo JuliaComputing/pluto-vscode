@@ -1,4 +1,5 @@
 import * as vscode from "vscode"
+import * as path from "path"
 import { PlutoBackend as PlutoBackend } from "./backend"
 import { accessSync, readFileSync } from "fs"
 import { tmpdir } from "os"
@@ -6,6 +7,7 @@ import { join } from "path"
 import { v4 as uuid } from "uuid"
 import { create_proxy } from "./ws-proxy"
 import { PlutoEditor } from "./PlutoEditor"
+import { TextEncoder } from "util"
 
 /*
 HELLO
@@ -17,19 +19,56 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(PlutoEditor.register(context))
     context.subscriptions.push(
         vscode.commands.registerCommand("plutoView.start", () => {
-            vscode.commands.executeCommand(
-                "vscode.openWith",
+            // THE ONLY WAY I WAS ABLE TO DO THIS IS
+            // ask the user for the file name IN ADVANCE, then write an empty notebook there, then open it
+            // ugh
+            vscode.window
+                .showSaveDialog({
+                    // TODO: initialize with a cute filename
+                    filters: {
+                        Julia: [".jl"],
+                    },
+                })
+                .then(async (path) => {
+                    // TODO: generate a temporary file(?) if none was given by the user
+                    // let path = path ?? vscode.Uri.parse("untitled:untitled-1.jl")
+                    if (path) {
+                        await vscode.workspace.fs.writeFile(path, new TextEncoder().encode(empty_notebook_contents()))
+                        vscode.commands.executeCommand("vscode.openWith", path, "plutoView")
+                    }
+                })
 
-                // TODO: This currently fails because new notebook doesn't exist
-                vscode.Uri.joinPath(vscode.workspace.workspaceFolders![0].uri, "new notebook.jl"),
-                "plutoView"
-            )
-            // new_notebook(context)
+            // OTHER ATTEMPS
+
+            // THIS ONE almost works, but when you do the first Ctrl+S, it does not automatically add the .jl extension
+            // const filename = vscode.Uri.parse("untitled:untitled-1.jl")
+            // vscode.workspace.fs.writeFile(filename, new TextEncoder().encode(empty_notebook_contents())).then(() => {
+            // vscode.commands.executeCommand("vscode.openWith", filename, "plutoView")
+            // })
+
+            // ALSO CLOSE and the most official, but it opens the window twice, once in Pluto, once in a text editor.
+            // vscode.workspace
+            //     .openTextDocument({
+            //         content: empty_notebook_contents(),
+            //         language: "julia",
+            //     })
+            //     .then(async (document) => {
+            //         const to_close = vscode.workspace.textDocuments.filter((d) => d === document)
+
+            //         await vscode.commands.executeCommand("vscode.openWith", document.uri, "plutoView")
+            //         // vs code already opens a regular .jl text editor, we should manually close that...
+            //         // TODO: this gives a ...are you sure... popup :(((
+            //         for (const doc of to_close) {
+            //             console.error("closing!!!")
+            //             await vscode.window.showTextDocument(doc)
+            //             await vscode.commands.executeCommand("workbench.action.closeActiveEditor")
+            //         }
+            //     })
         })
     )
     context.subscriptions.push(
         // TODO: This only works if a backend already exists. TODO: spin out a backend on activate!
-        vscode.commands.registerCommand("plutoView.openExistingWith", (selectedDocumentURI) => {
+        vscode.commands.registerCommand("plutoView.openCurrentWith", (selectedDocumentURI) => {
             vscode.commands.executeCommand("vscode.openWith", selectedDocumentURI, "plutoView")
         })
     )
@@ -231,4 +270,19 @@ function new_notebook(context: vscode.ExtensionContext) {
 // this method is called when your extension is deactivated
 export function deactivate() {
     PlutoBackend.deactivate()
+}
+
+const empty_notebook_contents = () => {
+    let id = uuid()
+    return `### A Pluto.jl notebook ###
+# v0.17.1
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ ${id}
+i'm new here!
+
+# ╔═╡ Cell order:
+# ╠═${id}`
 }

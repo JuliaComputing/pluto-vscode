@@ -25,12 +25,12 @@
         "commands": [
             {
                 "command": "plutoView.start",
-                "title": "Start a Pluto.jl notebook",
+                "title": "Start a Pluto.jl notebook 🎈",
                 "category": "Pluto"
             },
             {
-                "command": "plutoView.openExistingWith",
-                "title": "Open with Pluto.jl",
+                "command": "plutoView.openCurrentWith",
+                "title": "Open with Pluto.jl 🎈",
                 "category": "Pluto"
             }
         ],
@@ -41,6 +41,9 @@
                 "selector": [
                     {
                         "filenamePattern": "*.jl"
+                    },
+                    {
+                        "filenamePattern": "*.plutojl"
                     }
                 ],
                 "priority": "option"
@@ -50,14 +53,14 @@
             "editor/title/context": [
                 {
                     "when": "resourceLangId == julia",
-                    "command": "plutoView.openExistingWith",
-                    "group": "3_preview@3"
+                    "command": "plutoView.openCurrentWith",
+                    "group": "3_open@3"
                 }
             ],
             "explorer/context": [
                 {
                     "when": "resourceLangId == julia",
-                    "command": "plutoView.openExistingWith",
+                    "command": "plutoView.openCurrentWith",
                     "group": "navigation@4"
                 }
             ]
