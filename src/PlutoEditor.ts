@@ -76,51 +76,49 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		
 		let file_change_throttle_delay = 1000
 		
-		backend.file_events.on(
-            "change",
-			// throttle to avoid too many file events, and make sure that the file events are processed in order.
-            sequential_promises_lossy(async (changed_filename: string, f: string) => {
-                // TODO:
-                // 1. ~Throttle~ DONE
-                // 2. Serialize
-                // 3. Make more minimal changes (even though Pluto doesn't!)
-                //
-                if (changed_filename === jlfile) {
-                    const t = document.getText()
-                    if (t !== f) {
-                        // This will help a bit
-                        // use vscode.TextEdit instead!
-                        const edit = new vscode.WorkspaceEdit()
-                        edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), f)
-						let edit_failed = false
-                        try {
-                            await vscode.workspace.applyEdit(edit)
-                        } catch (err) {
-                            console.log("Concurrently changed document - trying again in 500ms", err)
-							await delay(500)
-							try {
-								await vscode.workspace.applyEdit(edit)
-							} catch(e) {
-								console.log("Concurrently changed document failed again, giving up", e)
-								edit_failed = true
-							}
-                        }
-						// Trigger saving the document in VS Code
-						if(!edit_failed) {
-							try {
-								console.log("triggering file save without formatting")
-								await vscode.commands.executeCommand("workbench.action.files.saveWithoutFormatting")
-							} catch (e) {
-								console.log("Failed to trigger file save...", e)
-							}
+		// throttle to avoid too many file events, and make sure that the file events are processed in order.
+		const file_event_listener = sequential_promises_lossy(async (changed_filename: string, f: string) => {
+			// TODO:
+			// 1. ~Throttle~ DONE
+			// 2. Serialize
+			// 3. Make more minimal changes (even though Pluto doesn't!)
+			//
+			if (changed_filename === jlfile) {
+				const t = document.getText()
+				if (t !== f) {
+					// This will help a bit
+					// use vscode.TextEdit instead!
+					const edit = new vscode.WorkspaceEdit()
+					edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), f)
+					let edit_failed = false
+					try {
+						await vscode.workspace.applyEdit(edit)
+					} catch (err) {
+						console.log("Concurrently changed document - trying again in 500ms", err)
+						await delay(500)
+						try {
+							await vscode.workspace.applyEdit(edit)
+						} catch(e) {
+							console.log("Concurrently changed document failed again, giving up", e)
+							edit_failed = true
 						}
-						
-						await delay(file_change_throttle_delay)
-                    }
-                    this.renderStatusBar()
-                }
-            })
-        )
+					}
+					// Trigger saving the document in VS Code
+					if(!edit_failed) {
+						try {
+							console.log("triggering file save without formatting")
+							await vscode.commands.executeCommand("workbench.action.files.saveWithoutFormatting")
+						} catch (e) {
+							console.log("Failed to trigger file save...", e)
+						}
+					}
+					
+					await delay(file_change_throttle_delay)
+				}
+				this.renderStatusBar()
+			}
+		})
+		backend.file_events.on("change", file_event_listener)
 
 		// Hook up event handlers so that we can synchronize the webview with the text document.
 		//
@@ -129,17 +127,17 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// 
 		// Remember that a single text document can also be shared between multiple custom
 		// editors (this happens for example when you split a custom editor)
-		const changeDocumentSubscription = vscode.workspace.onDidSaveTextDocument(doc => {
+		vscode.workspace.onDidSaveTextDocument(doc => {
 			console.log("didsave", webviewPanel.active)
 			if (doc.uri.toString() === document.uri.toString()) {
 				// When VSCode updates the document, notify pluto from here	
 				backend.send_command("update", { jlfile, text: doc.getText() })
 			}
 			this.renderStatusBar()
-		});
+		}, disposables);
 		
 
-		const renameDocumentSubscription = vscode.workspace.onWillRenameFiles((e) => {
+		vscode.workspace.onWillRenameFiles((e) => {
 			e.files.forEach(v => {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
 				if (haveWV && document.uri === v.oldUri) {
@@ -149,9 +147,9 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				}
 			})
 			this.renderStatusBar()
-		})
+		}, disposables)
 
-		const afterRenameDocumentSubscription = vscode.workspace.onDidRenameFiles((e) => {
+		vscode.workspace.onDidRenameFiles((e) => {
 			e.files.forEach(v => {
 				const haveWV = Array.from(this.webviews.get(v.oldUri)).length !== 0
 				if (haveWV && document.uri === v.oldUri) {
@@ -161,10 +159,10 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				}
 			})
 			this.renderStatusBar()
-		})
+		}, disposables)
 
 		// This should be handled by the last disposal anyway
-		const willDeleteDocumentSubscription = vscode.workspace.onWillDeleteFiles((e) => {
+		vscode.workspace.onWillDeleteFiles((e) => {
 			e.files.forEach(uri => {
 				const haveWV = Array.from(this.webviews.get(uri)).length !== 0
 				if (haveWV && document.uri === uri) {
@@ -172,7 +170,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				}
 			})
 			this.renderStatusBar()
-		})
+		}, disposables)
 
 
 		// onDidChangeTextDocument, 
@@ -195,10 +193,9 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				}, 10000)
 			}
 			this.webviews.remove(webviewPanel);
-			changeDocumentSubscription.dispose();
-			renameDocumentSubscription.dispose();
-			afterRenameDocumentSubscription.dispose();
-			willDeleteDocumentSubscription.dispose();
+			backend.file_events.off("change", file_event_listener)
+			disposables.forEach((x) => x.dispose())
+			
 			this.renderStatusBar();
 		});
 

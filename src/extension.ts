@@ -127,16 +127,13 @@ function new_notebook(context: vscode.ExtensionContext) {
     /**
      * VS Code has the concept of `Disposable`, which is a resource/process/something that needs to be disposed when no longer used. We create an array `disposables` of things that need to be disposed when this window is closed.
      */
-    let disposables: vscode.Disposable[] = []
+    let disposables: vscode.Disposable[] = [panel]
     let disposed: boolean = false
 
     panel.onDidDispose(() => {
         console.log("disposing!")
         disposed = true
-
         // Clean up our resources
-        panel.dispose()
-
         disposables.forEach((x) => x.dispose())
     })
 
