@@ -74,32 +74,53 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			},
 		})
 		
-		backend.file_events.on("change", 
-		   (changed_filename: string, f: string) => {
-			   // TODO: 
-			   // 1. Throttle
-			   // 2. Serialize
-			   // 3. Make more minimal changes (even though Pluto doesn't!)
-			   //
-			   if(changed_filename === jlfile) {
-				   const t = document.getText()
-				   if (t !== f) { // This will help a bit
-					   // use vscode.TextEdit instead!
-					   const edit = new vscode.WorkspaceEdit();
-					   edit.replace(
-						   document.uri,
-						   new vscode.Range(0, 0, document.lineCount, 0),
-						   f)
-					   try {
-						   vscode.workspace.applyEdit(edit)
-					   } catch (err) {
-						   console.log("Concurrently changed document - trying again in 500ms", err)
-						   setTimeout(() => vscode.workspace.applyEdit(edit), 500)
-					   }
-				   }
-				   this.renderStatusBar()
-			   }
-		   },)
+		let file_change_throttle_delay = 1000
+		
+		backend.file_events.on(
+            "change",
+			// throttle to avoid too many file events, and make sure that the file events are processed in order.
+            sequential_promises_lossy(async (changed_filename: string, f: string) => {
+                // TODO:
+                // 1. ~Throttle~ DONE
+                // 2. Serialize
+                // 3. Make more minimal changes (even though Pluto doesn't!)
+                //
+                if (changed_filename === jlfile) {
+                    const t = document.getText()
+                    if (t !== f) {
+                        // This will help a bit
+                        // use vscode.TextEdit instead!
+                        const edit = new vscode.WorkspaceEdit()
+                        edit.replace(document.uri, new vscode.Range(0, 0, document.lineCount, 0), f)
+						let edit_failed = false
+                        try {
+                            await vscode.workspace.applyEdit(edit)
+                        } catch (err) {
+                            console.log("Concurrently changed document - trying again in 500ms", err)
+							await delay(500)
+							try {
+								await vscode.workspace.applyEdit(edit)
+							} catch(e) {
+								console.log("Concurrently changed document failed again, giving up", e)
+								edit_failed = true
+							}
+                        }
+						// Trigger saving the document in VS Code
+						if(!edit_failed) {
+							try {
+								console.log("triggering file save without formatting")
+								await vscode.commands.executeCommand("workbench.action.files.saveWithoutFormatting")
+							} catch (e) {
+								console.log("Failed to trigger file save...", e)
+							}
+						}
+						
+						await delay(file_change_throttle_delay)
+                    }
+                    this.renderStatusBar()
+                }
+            })
+        )
 
 		// Hook up event handlers so that we can synchronize the webview with the text document.
 		//
@@ -109,12 +130,14 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// Remember that a single text document can also be shared between multiple custom
 		// editors (this happens for example when you split a custom editor)
 		const changeDocumentSubscription = vscode.workspace.onDidSaveTextDocument(doc => {
+			console.log("didsave", webviewPanel.active)
 			if (doc.uri.toString() === document.uri.toString()) {
 				// When VSCode updates the document, notify pluto from here	
 				backend.send_command("update", { jlfile, text: doc.getText() })
 			}
 			this.renderStatusBar()
 		});
+		
 
 		const renameDocumentSubscription = vscode.workspace.onWillRenameFiles((e) => {
 			e.files.forEach(v => {
@@ -344,4 +367,46 @@ class WebviewCollection {
 			}
 		}
 	}
+}
+
+
+let delay = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * Wraps around an async function `f`, and returns a sequential version, `g`. Calling `g` will call `f`, and arguments are passed to `f`. If `g` is called another time *while `f` is still running*, it will wait for the last evaluation to finish before calling `f` again.
+ * 
+ * # Throttle example
+ * `sequential_promises_lossy` is kind of like a `throttle` function (because it is lossy). In fact, you can use it to create a `throttle` function!
+ * ```js
+ * const throttle(f, ms) =>
+ *   sequential_promises_lossy((...args) => {
+ *     f(...args)
+ *     // await a promise that resolves after `ms` milliseconds
+ *     await new Promise(r => setTimeout(r, ms))
+ *   })
+ * ```
+ */
+let sequential_promises_lossy = (f_async: (...args: any[]) => Promise<any>) => {
+    // let last = Promise.resolve()
+
+    let busy = false
+    let wants_to_run = false
+    let args_to_run: any[] = []
+
+    let run = async () => {
+        busy = true
+        while (wants_to_run) {
+            wants_to_run = false
+            await f_async(...args_to_run)
+        }
+        busy = false
+    }
+
+    return (...args: any[]) => {
+        args_to_run = args
+        wants_to_run = true
+        if (!busy) {
+            run()
+        }
+    }
 }
