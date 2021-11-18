@@ -68,51 +68,38 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
 		const backend = PlutoBackend.create_async(this.context, PlutoEditor.statusbar, {
 			pluto_asset_dir: this.pluto_asset_dir,
-			/**
-			 * VERY important implementation detail:
-			 * This function gets instanciated only the _first_ time the 
-			 * pluto editor runs.
-			 * 
-			 * That means, the code must *not* create closures around the
-			 * initial context because subsequent webviews do not apply.
-			 * 
-			 * we use this.webviews.getByNotebookID for this exact reason.
-			 * 
-			 */
-			on_filechange: (file: string, f: string) => {
-				// TODO: 
-				// 1. Throttle
-				// 2. Serialize
-				// 3. Make more minimal changes (even though Pluto doesn't!)
-				//
-				const notebook_id = file.replace("editor_bespoke_", "").replace(".jl", "")
-				const webviewsForFile = Array.from(this.webviews.getByNotebookID(notebook_id))
-				if (webviewsForFile.length === 0) {
-					return
-				}
-				const [{ document, uri }] = webviewsForFile
-				const t = document.getText()
-				if (t !== f) { // This will help a bit
-					// use vscode.TextEdit instead!
-					const edit = new vscode.WorkspaceEdit();
-					edit.replace(
-						uri,
-						new vscode.Range(0, 0, document.lineCount, 0),
-						f)
-					try {
-						vscode.workspace.applyEdit(edit)
-					} catch (err) {
-						console.log("Concurrently changed document - trying again in 500ms", err)
-						setTimeout(() => vscode.workspace.applyEdit(edit), 500)
-					}
-				}
-				this.renderStatusBar()
-			},
 			vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(this.pluto_asset_dir)),
 			pluto_config: {
 				// workspace_use_distributed: false,
 			},
 		})
+		
+		backend.file_events.on("change", 
+		   (changed_filename: string, f: string) => {
+			   // TODO: 
+			   // 1. Throttle
+			   // 2. Serialize
+			   // 3. Make more minimal changes (even though Pluto doesn't!)
+			   //
+			   if(changed_filename === jlfile) {
+				   const t = document.getText()
+				   if (t !== f) { // This will help a bit
+					   // use vscode.TextEdit instead!
+					   const edit = new vscode.WorkspaceEdit();
+					   edit.replace(
+						   document.uri,
+						   new vscode.Range(0, 0, document.lineCount, 0),
+						   f)
+					   try {
+						   vscode.workspace.applyEdit(edit)
+					   } catch (err) {
+						   console.log("Concurrently changed document - trying again in 500ms", err)
+						   setTimeout(() => vscode.workspace.applyEdit(edit), 500)
+					   }
+				   }
+				   this.renderStatusBar()
+			   }
+		   },)
 
 		// Hook up event handlers so that we can synchronize the webview with the text document.
 		//

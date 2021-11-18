@@ -165,7 +165,6 @@ function new_notebook(context: vscode.ExtensionContext) {
         pluto_config: {
             // workspace_use_distributed: false,
         },
-        on_filechange: () => {},
     })
 
     backend.ready.then(async () => {

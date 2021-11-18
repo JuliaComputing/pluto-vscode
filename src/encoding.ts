@@ -12,6 +12,6 @@ export const decode_base64_to_Uint8Array = (data: string): Promise<Uint8Array> =
     return Promise.resolve(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength / Uint8Array.BYTES_PER_ELEMENT))
 }
 
-export const decode_base64_to_string = (data: string): String => {
+export const decode_base64_to_string = (data: string): string => {
     return Buffer.from(data, "base64").toString()
 }

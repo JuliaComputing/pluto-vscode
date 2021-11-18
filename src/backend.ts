@@ -7,10 +7,11 @@ import _ from "lodash"
 import { decode_base64_to_string } from "./encoding"
 import { readdirSync, unlinkSync } from "fs"
 
+import { EventEmitter } from "events"
+
 type BackendOpts = {
     pluto_asset_dir: string
     vscode_proxy_root: vscode.Uri
-    on_filechange: Function
     /** These properties correspond to keyword arguments to `Pluto.run`. e.g. `{ workspace_use_distributed: false, auto_reload_from_file: true }` */
     pluto_config?: Object
 }
@@ -59,6 +60,8 @@ export class PlutoBackend {
 
     public ready: Promise<boolean>
 
+    public file_events: EventEmitter
+
     private constructor(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
         this._status = status
         this._opts = opts
@@ -75,6 +78,8 @@ export class PlutoBackend {
         this.ready = new Promise<boolean>((r) => {
             resolve_ready = r
         })
+        this.file_events = new EventEmitter()
+
         // hack to let me write async code inside the constructor
         Promise.resolve().then(async () => {
             const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {})]
@@ -107,8 +112,8 @@ export class PlutoBackend {
                     const notebookString = dataString.substr(dataString.indexOf("## ") + 3).trim()
                     const decoded = decode_base64_to_string(notebookString)
                     console.log("Notebook updated!", decoded.substring(0, 100))
-                    // Let VSCode know the file changed
-                    this._opts?.on_filechange?.(jlfile, decoded)
+                    // Let listeners know the file changed
+                    this.file_events.emit("change", jlfile, decoded)
                     return
                 }
 
