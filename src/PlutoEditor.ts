@@ -7,10 +7,6 @@ import { PlutoBackend } from './backend';
 import { getWebviewOptions, LOADING_HTML } from './extension';
 import { create_proxy } from './ws-proxy';
 
-/**
- * Provider for Pluto editors.
- * 
- */
 export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
 	public static register(context: vscode.ExtensionContext): vscode.Disposable {
@@ -37,8 +33,6 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
 	/**
 	 * Called when our custom editor is opened.
-	 * 
-	 * 
 	 */
 	public async resolveCustomTextEditor(
 		document: vscode.TextDocument,

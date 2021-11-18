@@ -16,6 +16,7 @@ This file is the entry point of the extension. The important function here is `n
 */
 
 export function activate(context: vscode.ExtensionContext) {
+    console.log("Activating extension pluto-vscode")
     context.subscriptions.push(PlutoEditor.register(context))
     context.subscriptions.push(
         vscode.commands.registerCommand("plutoView.start", () => {
@@ -64,10 +65,12 @@ export function activate(context: vscode.ExtensionContext) {
             //             await vscode.commands.executeCommand("workbench.action.closeActiveEditor")
             //         }
             //     })
+
+            // ORIGINAL: opens a new notebook, but as a webview, not as an editor
+            // new_notebook(context)
         })
     )
     context.subscriptions.push(
-        // TODO: This only works if a backend already exists. TODO: spin out a backend on activate!
         vscode.commands.registerCommand("plutoView.openCurrentWith", (selectedDocumentURI) => {
             vscode.commands.executeCommand("vscode.openWith", selectedDocumentURI, "plutoView")
         })

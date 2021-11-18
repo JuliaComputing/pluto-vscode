@@ -16,7 +16,7 @@
     ],
     "activationEvents": [
         "onCommand:plutoView.start",
-        "onCommand:plutoView.new",
+        "onCommand:plutoView.openCurrentWith",
         "onWebviewPanel:plutoView",
         "onCustomEditor:plutoView"
     ],
