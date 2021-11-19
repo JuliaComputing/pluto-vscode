@@ -4,7 +4,7 @@ import { join } from "path"
 import { v4 as uuid } from "uuid"
 import * as vscode from "vscode"
 import { PlutoBackend } from "./backend"
-import { getWebviewOptions, LOADING_HTML } from "./extension"
+import { LOADING_HTML } from "./extension"
 import { create_proxy } from "./ws-proxy"
 import { PlutoEditor } from "./PlutoEditor"
 
@@ -12,7 +12,7 @@ export const pluto_asset_dir = join(tmpdir(), uuid())
 /** A temporary directory that starts out empty. We will ask the Pluto runner to fill this directory with Pluto's frontend assets, and with 'bespoke editors'. Search for 'bespoke' to learn more! */
 console.log("pluto_asset_dir: ", pluto_asset_dir)
 
-export const create_default_backend = (extensionPath: string) => {
+export const get_default_backend = (extensionPath: string) => {
     return PlutoBackend.create_async(extensionPath, PlutoEditor.statusbar, {
         pluto_asset_dir,
         pluto_config: {
@@ -24,7 +24,6 @@ export const create_default_backend = (extensionPath: string) => {
 export const setup_pluto_in_webview = ({
     panel,
     context,
-    pluto_asset_dir,
     notebook_id,
     editor_html_filename,
     renderStatusBar,
@@ -33,7 +32,6 @@ export const setup_pluto_in_webview = ({
 }: {
     panel: vscode.WebviewPanel
     context: vscode.ExtensionContext
-    pluto_asset_dir: string
     notebook_id: string
     editor_html_filename: string
     renderStatusBar: Function
@@ -41,7 +39,7 @@ export const setup_pluto_in_webview = ({
     initialize_notebook: Function
 }) => {
     // Setup initial content for the webview
-    panel.webview.options = getWebviewOptions(context.extensionUri, pluto_asset_dir)
+    panel.webview.options = getWebviewOptions(context.extensionUri)
 
     renderStatusBar()
     panel.webview.html = LOADING_HTML
@@ -119,4 +117,14 @@ export const setup_pluto_in_webview = ({
             }
         }, 200)
     })
+}
+
+export function getWebviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
+    return {
+        // Enable javascript in the webview
+        enableScripts: true,
+
+        // And restrict the webview to only loading content from our extension's `media` directory and Pluto's asset dir.
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media"), vscode.Uri.file(pluto_asset_dir)],
+    }
 }

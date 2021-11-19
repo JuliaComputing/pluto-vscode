@@ -1,12 +1,6 @@
-import { accessSync, readFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
 import { v4 as uuid } from 'uuid';
 import * as vscode from 'vscode';
-import { PlutoBackend } from './backend';
-import { getWebviewOptions, LOADING_HTML } from './extension';
-import { create_proxy } from './ws-proxy';
-import { pluto_asset_dir, setup_pluto_in_webview } from './setup_webview';
+import { get_default_backend, setup_pluto_in_webview } from './setup_webview';
 
 export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
@@ -36,13 +30,15 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 	 */
 	public async resolveCustomTextEditor(
 		document: vscode.TextDocument,
-		webviewPanel: vscode.WebviewPanel,
+		panel: vscode.WebviewPanel,
 		_token: vscode.CancellationToken
 	): Promise<void> {
-		// Setup initial content for the webview
-		webviewPanel.webview.options =
-			getWebviewOptions(this.context.extensionUri, pluto_asset_dir)
-
+		
+		console.error("startyyy")
+		
+		let disposed: boolean = false
+		let disposables: vscode.Disposable[] = []
+		
 		const currentWebviews = Array.from(this.webviews.get(document.uri))
 		const hasMoreWebviews = currentWebviews.length !== 0
 		// Get this only once per user's file - UPDATE: persist UUID per URI
@@ -53,28 +49,12 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		const editor_html_filename = `editor_bespoke_${notebook_id}.html`
 		const jlfile = `editor_bespoke_${notebook_id}.jl`
 
-		this.webviews.add(document, notebook_id, webviewPanel);
-		this.renderStatusBar()
-		webviewPanel.webview.html = LOADING_HTML;
-
-		let disposed: boolean = false
-		let disposables: vscode.Disposable[] = []
-
-		const set_html = (title: string, contents: string) => {
-			webviewPanel.title = title
-			webviewPanel.webview.html = contents
-		}
+		this.webviews.add(document, notebook_id, panel);
 		
 		
-
-
-		const backend = PlutoBackend.create_async(this.context.extensionPath, PlutoEditor.statusbar, {
-			pluto_asset_dir: pluto_asset_dir,
-			pluto_config: {
-				// workspace_use_distributed: false,
-			},
-		})
+		const backend = get_default_backend(this.context.extensionPath)
 		
+
 		let file_change_throttle_delay = 1000
 		
 		// throttle to avoid too many file events, and make sure that the file events are processed in order.
@@ -129,7 +109,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// Remember that a single text document can also be shared between multiple custom
 		// editors (this happens for example when you split a custom editor)
 		vscode.workspace.onDidSaveTextDocument(doc => {
-			console.log("didsave", webviewPanel.active)
+			console.log("didsave", panel.active)
 			if (doc.uri.toString() === document.uri.toString()) {
 				// When VSCode updates the document, notify pluto from here	
 				backend.send_command("update", { jlfile, text: doc.getText() })
@@ -172,6 +152,8 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			})
 			this.renderStatusBar()
 		}, disposables)
+		
+		console.error("asdfasdf")
 
 
 		// onDidChangeTextDocument, 
@@ -180,7 +162,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 		// onDidRenameFiles (or will, dunno!)
 
 		// Make sure we get rid of the listener when our editor is closed.
-		webviewPanel.onDidDispose(() => {
+		panel.onDidDispose(() => {
 			disposed = true
 			if (this.webviews.canShutdown(document.uri, 1)) {
 				const curi = document.uri
@@ -193,81 +175,42 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 						backend.send_command("shutdown", { jlfile })
 				}, 10000)
 			}
-			this.webviews.remove(webviewPanel);
+			this.webviews.remove(panel);
 			backend.file_events.off("change", file_event_listener)
 			disposables.forEach((x) => x.dispose())
 			
 			this.renderStatusBar();
 		});
-
-		backend.ready.then(async () => {
-			const text = document.getText()
-			// Send a command to open the file only if there is not a file yet.
-			if (!hasMoreWebviews)
-				backend.send_command("open", {
-					editor_html_filename,
-					notebook_id,
-					vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(pluto_asset_dir)).toString(),
-					text,
-					jlfile,
-					frontend_params: {
-						// disable_ui: true,
-					},
-				})
-			const interval_handler = setInterval(() => {
-				/*
-				This loop will keep checking whether the bespoke editor file has been created.
-				
-				Since generating the bespoke editor is the last thing that the Pluto runner does, this is a low-tech way to know that the runner is ready. 🌝
-				*/
-				try {
-					// console.log("checking file existence!")
-					accessSync(join(pluto_asset_dir, editor_html_filename))
-                	// last function call will throw if the file does not exist yet.
-					
-                	// From this point on, the bespoke editor file exists, the runner is ready, and we will continue setting up this beautiful IDE experience for our patient users.
-					// console.log("file exists!")
-
-					setTimeout(async () => {
-						const bespoke_editor_contents = readFileSync(join(pluto_asset_dir, editor_html_filename), {
-							encoding: "utf8",
-						})
-
-						console.log("Creating proxy...")
-						await create_proxy({
-							ws_address: `ws://localhost:${await backend.port}/?secret=${backend.secret}`,
-							send_to_client: (x: any) => {
-								// TODO: the fact that this is called when disposed
-								// means we're memory leaking. Fix that!
-								if (!disposed) {
-									return webviewPanel.webview.postMessage(x)
-								}
-							},
-							create_client_listener: (f: any) => {
-								webviewPanel.webview.onDidReceiveMessage(f, null, disposables)
-							},
-							alert: (x: string) => {
-								return vscode.window.showInformationMessage(x, { modal: true })
-							},
-							confirm: (x: string) => {
-								return vscode.window.showInformationMessage(x, { modal: true }, ...["Yes", "No"]).then((answer) => answer === "Yes")
-							},
-						})
-						console.log("Proxy created!")
-
-                    	// Now that the proxy is set up, we can set the HTML contents of our Webview, which will trigger it to load.
-						console.log("Loading page HTML")
-						set_html("Pluto", bespoke_editor_contents)
-					}, 50)
-
-					clearInterval(interval_handler)
-				} catch (e) {
-					// TODO: check the error type and rethrow or handle correctly if it's not a file-does-not-exist-yet error?
-                	// TODO: Maybe add a timeout
-				}
-			}, 200)
-
-		})
+		
+		console.error("aa")
+		const args = {
+            panel,
+            context: this.context,
+            notebook_id,
+            editor_html_filename,
+            renderStatusBar: () => this.renderStatusBar(),
+            backend,
+            initialize_notebook: async (extra_details: Object) => {
+                const text = document.getText()
+                // Send a command to open the file only if there is not a file yet.
+				console.error("bb")
+				if (!hasMoreWebviews) {
+                    await backend.send_command("open", {
+                        editor_html_filename,
+                        notebook_id,
+                        text,
+                        jlfile,
+                        frontend_params: {
+                            // disable_ui: true,
+                        },
+                        ...extra_details,
+                    })
+                }
+            },
+        }
+		console.error(args)
+		
+		setup_pluto_in_webview(args)
 	}
 }
 
