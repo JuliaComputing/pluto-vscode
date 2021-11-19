@@ -145,22 +145,20 @@ command_task = Pluto.@asynclog while true
 	type = get(new_command, "type", "")
 	detail = get(new_command, "detail", Dict())
 	
-	vscode_proxy_root = let
-		s = get(detail, "vscode_proxy_root", "not given")
-		if isempty(s) || endswith(s, "/")
-			s
-		else
-			s * "/"
-		end
-	end
 	
-	if type == "new"
+	if type == "open"
 		editor_html_filename = detail["editor_html_filename"]
-		nb = Pluto.SessionActions.new(pluto_server_session; notebook_id=UUID(detail["notebook_id"]))
-		generate_output(nb, editor_html_filename, vscode_proxy_root)
+		vscode_proxy_root = let
+			s = get(detail, "vscode_proxy_root", "not given")
+			if isempty(s) || endswith(s, "/")
+				s
+			else
+				s * "/"
+			end
+		end
+		frontend_params = get(detail, "frontend_params", Dict())
 		
-	elseif type == "open"
-		editor_html_filename = detail["editor_html_filename"]
+		
 		jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
 		extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
 		open(jlpath, "w") do f
@@ -168,7 +166,7 @@ command_task = Pluto.@asynclog while true
 		end
 		nb = Pluto.SessionActions.open(pluto_server_session, jlpath; notebook_id=UUID(detail["notebook_id"]))
 		filenbmap[detail["jlfile"]] = nb
-		generate_output(nb, editor_html_filename, vscode_proxy_root)
+		generate_output(nb, editor_html_filename, vscode_proxy_root, frontend_params)
 		
 	elseif type == "update"
 		nb = filenbmap[detail["jlfile"]]
