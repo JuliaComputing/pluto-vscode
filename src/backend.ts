@@ -4,10 +4,22 @@ import * as path from "path"
 import { v4 as uuid } from "uuid"
 import portastic from "portastic"
 import _ from "lodash"
+import { decode_base64_to_string } from "./encoding"
+import { EventEmitter } from "events"
+import { get_status_bar } from "./status_bar"
+import { pluto_asset_dir } from "./setup_webview"
+
+export const get_default_backend = (extensionPath: string) => {
+    return PlutoBackend.create_async(extensionPath, {
+        pluto_asset_dir,
+        pluto_config: {
+            // workspace_use_distributed: false,
+        },
+    })
+}
 
 type BackendOpts = {
     pluto_asset_dir: string
-    vscode_proxy_root: vscode.Uri
     /** These properties correspond to keyword arguments to `Pluto.run`. e.g. `{ workspace_use_distributed: false, auto_reload_from_file: true }` */
     pluto_config?: Object
 }
@@ -15,14 +27,15 @@ type BackendOpts = {
 /** This code launches the Pluto runner (julia-runtime/run.jl) and keeps a connection with it. Communication happens over stdin/stdout, with JSON. You can use `send_command` to say something to the Pluto runner. */
 export class PlutoBackend {
     private static _instance: PlutoBackend | null = null
-    public static create_async(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
+    public static create_async(extensionPath: string, opts: BackendOpts) {
         if (PlutoBackend._instance) {
             return PlutoBackend._instance
         }
 
-        PlutoBackend._instance = new PlutoBackend(context, status, opts)
+        PlutoBackend._instance = new PlutoBackend(extensionPath, opts)
         return PlutoBackend._instance
     }
+
     public static deactivate() {
         if (PlutoBackend._instance) {
             PlutoBackend._instance.destroy()
@@ -47,16 +60,21 @@ export class PlutoBackend {
 
     private _status: vscode.StatusBarItem
     private _process?: cp.ChildProcess
+    private _opts?: BackendOpts
+    public working_directory: string
 
     public port: Promise<number>
     public secret: string
 
     public ready: Promise<boolean>
 
-    private constructor(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
-        this._status = status
+    public file_events: EventEmitter
 
+    private constructor(extensionPath: string, opts: BackendOpts) {
+        this._status = get_status_bar()
+        this._opts = opts
         console.log("Starting PlutoBackend...")
+        this.working_directory = path.join(extensionPath, "julia-runtime")
 
         this._status.text = "Pluto: starting..."
         this._status.show()
@@ -68,14 +86,16 @@ export class PlutoBackend {
         this.ready = new Promise<boolean>((r) => {
             resolve_ready = r
         })
+        this.file_events = new EventEmitter()
+
         // hack to let me write async code inside the constructor
         Promise.resolve().then(async () => {
-            const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {})]
+            const args = [opts.pluto_asset_dir, String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {})]
 
             const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })
             this._process = cp.spawn(julia_cmd, ["--project=.", "run.jl", ...args], {
-                cwd: path.join(context.extensionPath, "julia-runtime"),
+                cwd: this.working_directory,
             })
 
             this._process.on("exit", (code) => {
@@ -89,6 +109,22 @@ export class PlutoBackend {
             })
             this._process.stderr!.on("data", (data) => {
                 const text = data.slice(0, data.length - 1)
+                // TODO: Generalize this for more message types to be added
+                if (text.includes("Command: [[Notebook=")) {
+                    const jlfile = data
+                        .slice(data.indexOf("=") + 1, data.indexOf("]]"))
+                        .toString()
+                        .trim()
+                    console.log("jlfile", jlfile)
+                    const dataString = data.toString()
+                    const notebookString = dataString.substr(dataString.indexOf("## ") + 3).trim()
+                    const decoded = decode_base64_to_string(notebookString)
+                    console.log("Notebook updated!", decoded.substring(0, 100))
+                    // Let listeners know the file changed
+                    this.file_events.emit("change", jlfile, decoded)
+                    return
+                }
+
                 console.log(`📈${text}`)
 
                 // @info prints to stderr

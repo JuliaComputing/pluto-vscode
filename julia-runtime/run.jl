@@ -1,33 +1,53 @@
 ####
 @info "COMMAND LINE ARGUMENTS"
 
-asset_output_dir, vscode_proxy_root_raw, port_str, secret, pluto_launch_params = if isempty(ARGS)
+asset_output_dir, port_str, secret, pluto_launch_params = if isempty(ARGS)
 	@warn "No arguments given, using development defaults!"
 	mktempdir(cleanup=false), "", "4653", "asdf", "{}"
 else
 	ARGS
 end
 port = parse(Int, port_str)
-vscode_proxy_root = let s = vscode_proxy_root_raw
-	if isempty(s) || endswith(s, "/")
-		s
-	else
-		s * "/"
-	end
-end
 
 
 ####
 @info "PLUTO SETUP"
-
+using Base64
 import Pkg
 Pkg.instantiate()
 
 import JSON
 using Suppressor
+using UUIDs
 
 import Pluto
 
+#=  These are the function which document how we communicate, through STDIN
+# with the extension =#
+function getNextSTDINCommand()
+	new_command_str_raw = readuntil(stdin, '\0')
+	new_command_str = strip(new_command_str_raw, ['\0'])
+	JSON.parse(new_command_str)
+end
+
+function sendSTDERRCommand(name::String, payload::String)
+ 	io = IOBuffer()
+ 	io64 = Base64EncodePipe(io)
+ 	print(io64, payload)
+ 	close(io64)
+ 	@info "Command: [[Notebook=$(name)]] ## $(String(take!(io))) ###"
+end
+
+# This is the definition of type piracy
+@Base.kwdef struct PlutoExtensionSessionData
+	textRepresentations:: Dict{String, String}
+	notebooks::Dict{String, Pluto.Notebook}
+	session::Pluto.ServerSession
+	session_options::Any
+	jlfilesroot::String
+end
+
+# We spin up Pluto from here.
 pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
 	port=port,
 	launch_browser=false,
@@ -42,17 +62,37 @@ pluto_server_session = Pluto.ServerSession(;
 	options=pluto_server_options,
 )
 
+extensionData = PlutoExtensionSessionData(
+	Dict(),
+	Dict(),
+	pluto_server_session,
+	pluto_server_options,
+	joinpath(asset_output_dir, "jlfiles/")
+)
+
+function whenNotebookUpdates(jlfile, newString)
+	filename = splitpath(jlfile)[end]
+	sendSTDERRCommand(filename, newString)
+end
+
+# This is the definition of Type Piracy 😇
+function Pluto.save_notebook(notebook::Pluto.Notebook)
+	oldRepr = get(extensionData.textRepresentations, notebook.path, "")
+	newRepr = sprint() do io
+		Pluto.save_notebook(io, notebook)
+	end
+	if newRepr != oldRepr
+		extensionData.textRepresentations[notebook.path] = newRepr
+		whenNotebookUpdates(notebook.path, newRepr)
+	end
+end
 
 ###
 @info "OPEN NOTEBOOK"
 
-
-
-
-
 ####
 
-function generate_output(nb::Pluto.Notebook, filename::String, frontend_params::Dict=Dict())
+function generate_output(nb::Pluto.Notebook, filename::String, vscode_proxy_root::String, frontend_params::Dict=Dict())
 	@info "GENERATING HTML FOR BESPOKE EDITOR" string(nb.notebook_id)
 	new_editor_contents = Pluto.generate_html(;
 		pluto_cdn_root = vscode_proxy_root,
@@ -67,55 +107,89 @@ function generate_output(nb::Pluto.Notebook, filename::String, frontend_params::
 end
 
 
-copy_assets() = cp(Pluto.project_relative_path("frontend"), asset_output_dir; force=true)
+function copy_assets()
+	mkpath(asset_output_dir)
+	src = Pluto.project_relative_path("frontend")
+	dest = asset_output_dir
+	for f in readdir(src)
+		cp(joinpath(src, f), joinpath(dest, f); force=true)
+	end
+end
 
 copy_assets()
+mkpath(extensionData.jlfilesroot)
 
-
-try
-import BetterFileWatching
-@async try
-	BetterFileWatching.watch_folder(Pluto.project_relative_path("frontend")) do event
-		@info "Pluto asset changed!"
-		copy_assets()
+try ## Note: This is to assist with co-developing Pluto & this Extension
+	## In a production setting it's not necessary to watch pluto folder for updates
+	import BetterFileWatching
+	@async try
+		BetterFileWatching.watch_folder(Pluto.project_relative_path("frontend")) do event
+			@info "Pluto asset changed!"
+			# It's not safe to remove the folder
+			# because we reuse HTML files
+			copy_assets()
+			mkpath(joinpath(asset_output_dir, "jlfiles/"))
+		end
+	catch e
+		showerror(stderr, e, catch_backtrace())
 	end
-catch e
-	showerror(stderr, e, catch_backtrace())
-end
-@info "Watching Pluto folder for changes!"
+	@info "Watching Pluto folder for changes!"
 catch end
 
-
-
-
 command_task = Pluto.@asynclog while true
-	
-	new_command_str_raw = readuntil(stdin, '\0')
-	new_command_str = strip(new_command_str_raw, ['\0'])
-	new_command = JSON.parse(new_command_str)
+	filenbmap = extensionData.notebooks
+	new_command = getNextSTDINCommand()
 	
 	@info "New command received!" new_command
 	
 	type = get(new_command, "type", "")
 	detail = get(new_command, "detail", Dict())
 	
-	if type == "new"
+	
+	if type == "open"
 		editor_html_filename = detail["editor_html_filename"]
-		nb = Pluto.SessionActions.new(pluto_server_session)
+		vscode_proxy_root = let
+			s = get(detail, "vscode_proxy_root", "not given")
+			if isempty(s) || endswith(s, "/")
+				s
+			else
+				s * "/"
+			end
+		end
+		frontend_params = get(detail, "frontend_params", Dict())
 		
-		generate_output(nb, editor_html_filename)
-	elseif type == "open"
-		editor_html_filename = detail["editor_html_filename"]
-		nb = Pluto.SessionActions.open(pluto_server_session, detail["path"])
 		
-		generate_output(nb, editor_html_filename)
+		jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
+		extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
+		open(jlpath, "w") do f
+			write(f, detail["text"])
+		end
+		nb = Pluto.SessionActions.open(pluto_server_session, jlpath; notebook_id=UUID(detail["notebook_id"]))
+		filenbmap[detail["jlfile"]] = nb
+		generate_output(nb, editor_html_filename, vscode_proxy_root, frontend_params)
+		
+	elseif type == "update"
+		nb = filenbmap[detail["jlfile"]]
+		jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
+		open(jlpath, "w") do f
+			write(f, detail["text"])
+		end
+		Pluto.update_from_file(pluto_server_session, nb)
+		extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
+		
+	elseif type == "shutdown"
+		nb = get(filenbmap, detail["jlfile"], nothing);
+		!isnothing(nb) && Pluto.SessionActions.shutdown(
+			pluto_server_session,
+			nb, 
+			keep_in_session=false
+		)
+		
 	else
 		@error "Message of this type not recognised. " type
 	end
 	
 end
-
-
 
 ####
 @info "RUNNING PLUTO SERVER..."

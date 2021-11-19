@@ -15,18 +15,56 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:plutoView.start",
-        "onWebviewPanel:plutoView"
+        "onCommand:plutoEditor.start",
+        "onCommand:plutoEditor.openCurrentWith",
+        "onWebviewPanel:plutoEditor",
+        "onCustomEditor:plutoEditor"
     ],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "plutoView.start",
-                "title": "Start new notebook",
+                "command": "plutoEditor.start",
+                "title": "Start a Pluto.jl notebook 🎈",
+                "category": "Pluto"
+            },
+            {
+                "command": "plutoEditor.openCurrentWith",
+                "title": "Open with Pluto.jl 🎈",
                 "category": "Pluto"
             }
-        ]
+        ],
+        "customEditors": [
+            {
+                "viewType": "plutoEditor",
+                "displayName": "Pluto",
+                "selector": [
+                    {
+                        "filenamePattern": "*.jl"
+                    },
+                    {
+                        "filenamePattern": "*.plutojl"
+                    }
+                ],
+                "priority": "option"
+            }
+        ],
+        "menus": {
+            "editor/title/context": [
+                {
+                    "when": "resourceLangId == julia",
+                    "command": "plutoEditor.openCurrentWith",
+                    "group": "3_open@3"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "when": "resourceLangId == julia",
+                    "command": "plutoEditor.openCurrentWith",
+                    "group": "navigation@4"
+                }
+            ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",

@@ -1,5 +1,6 @@
 import { create_pluto_connection } from "./julia-ws-connection"
 import { base64_arraybuffer, decode_base64_to_Uint8Array } from "./encoding"
+const DEBUG = false
 
 /** Set up a proxy between the Pluto server and a new Webview. This will open a WebSocket connection with the Pluto server, and open an official-VS-Code-API-connection with the webview frontend.
  *
@@ -25,7 +26,7 @@ export const create_proxy = ({
     return new Promise<void>((resolve) => {
         const on_unrequested_update = async (update: Uint8Array) => {
             const to_send = { type: "ws_proxy", base64_encoded: await base64_arraybuffer(update) }
-            console.info("PROXY message from JULIA", to_send)
+            DEBUG && console.info("PROXY message from JULIA", to_send)
             await send_to_client(to_send)
         }
         const on_reconnect = () => {
@@ -46,7 +47,7 @@ export const create_proxy = ({
         }).then((connection) => {
             create_client_listener(async (message: { type: string; base64_encoded: string; text: string; token: string }) => {
                 if (message.type === "ws_proxy") {
-                    console.info("PROXY message from CLIENT", message)
+                    DEBUG && console.info("PROXY message from CLIENT", message)
                     const data = await decode_base64_to_Uint8Array(message.base64_encoded)
                     connection.send(data)
                 } else if (message.type === "alert") {
