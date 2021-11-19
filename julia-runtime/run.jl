@@ -107,7 +107,15 @@ function generate_output(nb::Pluto.Notebook, filename::String, vscode_proxy_root
 end
 
 
-copy_assets(force=true) = cp(Pluto.project_relative_path("frontend"), asset_output_dir; force=force)
+function copy_assets()
+	mkpath(asset_output_dir)
+	src = Pluto.project_relative_path("frontend")
+	dest = asset_output_dir
+	for f in readdir(src)
+		cp(joinpath(src, f), joinpath(dest, f); force=true)
+	end
+end
+
 copy_assets()
 mkpath(extensionData.jlfilesroot)
 
@@ -119,7 +127,7 @@ try ## Note: This is to assist with co-developing Pluto & this Extension
 			@info "Pluto asset changed!"
 			# It's not safe to remove the folder
 			# because we reuse HTML files
-			copy_assets(false)
+			copy_assets()
 			mkpath(joinpath(asset_output_dir, "jlfiles/"))
 		end
 	catch e
