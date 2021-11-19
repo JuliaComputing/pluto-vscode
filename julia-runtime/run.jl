@@ -1,20 +1,13 @@
 ####
 @info "COMMAND LINE ARGUMENTS"
 
-asset_output_dir, vscode_proxy_root_raw, port_str, secret, pluto_launch_params = if isempty(ARGS)
+asset_output_dir, port_str, secret, pluto_launch_params = if isempty(ARGS)
 	@warn "No arguments given, using development defaults!"
 	mktempdir(cleanup=false), "", "4653", "asdf", "{}"
 else
 	ARGS
 end
 port = parse(Int, port_str)
-vscode_proxy_root = let s = vscode_proxy_root_raw
-	if isempty(s) || endswith(s, "/")
-		s
-	else
-		s * "/"
-	end
-end
 
 
 ####
@@ -99,7 +92,7 @@ end
 
 ####
 
-function generate_output(nb::Pluto.Notebook, filename::String, frontend_params::Dict=Dict())
+function generate_output(nb::Pluto.Notebook, filename::String, vscode_proxy_root::String, frontend_params::Dict=Dict())
 	@info "GENERATING HTML FOR BESPOKE EDITOR" string(nb.notebook_id)
 	new_editor_contents = Pluto.generate_html(;
 		pluto_cdn_root = vscode_proxy_root,
@@ -144,10 +137,19 @@ command_task = Pluto.@asynclog while true
 	type = get(new_command, "type", "")
 	detail = get(new_command, "detail", Dict())
 	
+	vscode_proxy_root = let
+		s = get(detail, "vscode_proxy_root", "not given")
+		if isempty(s) || endswith(s, "/")
+			s
+		else
+			s * "/"
+		end
+	end
+	
 	if type == "new"
 		editor_html_filename = detail["editor_html_filename"]
 		nb = Pluto.SessionActions.new(pluto_server_session; notebook_id=UUID(detail["notebook_id"]))
-		generate_output(nb, editor_html_filename)
+		generate_output(nb, editor_html_filename, vscode_proxy_root)
 		
 	elseif type == "open"
 		editor_html_filename = detail["editor_html_filename"]
@@ -158,7 +160,7 @@ command_task = Pluto.@asynclog while true
 		end
 		nb = Pluto.SessionActions.open(pluto_server_session, jlpath; notebook_id=UUID(detail["notebook_id"]))
 		filenbmap[detail["jlfile"]] = nb
-		generate_output(nb, editor_html_filename)
+		generate_output(nb, editor_html_filename, vscode_proxy_root)
 		
 	elseif type == "update"
 		nb = filenbmap[detail["jlfile"]]

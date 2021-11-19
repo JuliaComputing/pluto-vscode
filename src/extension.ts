@@ -8,6 +8,7 @@ import { v4 as uuid } from "uuid"
 import { create_proxy } from "./ws-proxy"
 import { PlutoEditor } from "./PlutoEditor"
 import { TextEncoder } from "util"
+import { create_default_backend, pluto_asset_dir, setup_pluto_in_webview } from "./setup_webview"
 
 /*
 HELLO
@@ -23,21 +24,21 @@ export function activate(context: vscode.ExtensionContext) {
             // THE ONLY WAY I WAS ABLE TO DO THIS IS
             // ask the user for the file name IN ADVANCE, then write an empty notebook there, then open it
             // ugh
-            vscode.window
-                .showSaveDialog({
-                    // TODO: initialize with a cute filename
-                    filters: {
-                        Julia: [".jl"],
-                    },
-                })
-                .then(async (path) => {
-                    // TODO: generate a temporary file(?) if none was given by the user
-                    // let path = path ?? vscode.Uri.parse("untitled:untitled-1.jl")
-                    if (path) {
-                        await vscode.workspace.fs.writeFile(path, new TextEncoder().encode(empty_notebook_contents()))
-                        vscode.commands.executeCommand("vscode.openWith", path, "plutoView")
-                    }
-                })
+            // vscode.window
+            //     .showSaveDialog({
+            //         // TODO: initialize with a cute filename
+            //         filters: {
+            //             Julia: [".jl"],
+            //         },
+            //     })
+            //     .then(async (path) => {
+            //         // TODO: generate a temporary file(?) if none was given by the user
+            //         // let path = path ?? vscode.Uri.parse("untitled:untitled-1.jl")
+            //         if (path) {
+            //             await vscode.workspace.fs.writeFile(path, new TextEncoder().encode(empty_notebook_contents()))
+            //             vscode.commands.executeCommand("vscode.openWith", path, "plutoView")
+            //         }
+            //     })
 
             // OTHER ATTEMPS
 
@@ -67,7 +68,7 @@ export function activate(context: vscode.ExtensionContext) {
             //     })
 
             // ORIGINAL: opens a new notebook, but as a webview, not as an editor
-            // new_notebook(context)
+            new_notebook_2(context)
         })
     )
     context.subscriptions.push(
@@ -88,10 +89,6 @@ export function getWebviewOptions(extensionUri: vscode.Uri, pluto_asset_dir: str
 }
 
 const viewType = "plutoView"
-
-/** A temporary directory that starts out empty. We will ask the Pluto runner to fill this directory with Pluto's frontend assets, and with 'bespoke editors'. Search for 'bespoke' to learn more! */
-const pluto_asset_dir = join(tmpdir(), uuid())
-console.log("pluto_asset_dir: ", pluto_asset_dir)
 
 export const LOADING_HTML = `<!DOCTYPE html>
     <html lang="en">
@@ -156,9 +153,8 @@ function new_notebook(context: vscode.ExtensionContext) {
     const vscode_proxy_root = panel.webview.asWebviewUri(vscode.Uri.file(pluto_asset_dir))
 
     // Start creating a `backend`, i.e. start running the `julia-runtime/run.jl` script.
-    const backend = PlutoBackend.create_async(context, statusBarItem, {
+    const backend = PlutoBackend.create_async(context.extensionPath, statusBarItem, {
         pluto_asset_dir,
-        vscode_proxy_root,
         pluto_config: {
             // workspace_use_distributed: false,
         },
@@ -207,6 +203,7 @@ function new_notebook(context: vscode.ExtensionContext) {
         const editor_html_filename = `editor_bespoke_${notebook_id}.html`
         await backend.send_command("new", {
             editor_html_filename,
+            vscode_proxy_root,
             notebook_id,
             frontend_params: {
                 // disable_ui: true,
@@ -263,6 +260,69 @@ function new_notebook(context: vscode.ExtensionContext) {
                 // TODO: Maybe add a timeout
             }
         }, 200)
+    })
+}
+
+const new_notebook_2 = (context: vscode.ExtensionContext) => {
+    console.info("Launching Pluto panel!")
+
+    /** Where should the panel appear? */
+    const column = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.viewColumn : undefined
+
+    // Create a new panel. This `WebviewPanel` object has lots of functionality, see https://code.visualstudio.com/api/references/vscode-api#WebviewPanel and the `.webview` property: https://code.visualstudio.com/api/references/vscode-api#Webview
+    const panel = vscode.window.createWebviewPanel(
+        viewType,
+        "Pluto loading...",
+        column || vscode.ViewColumn.One,
+        getWebviewOptions(context.extensionUri, pluto_asset_dir)
+    )
+
+    /**
+     * VS Code has the concept of `Disposable`, which is a resource/process/something that needs to be disposed when no longer used. We create an array `disposables` of things that need to be disposed when this window is closed.
+     */
+    let disposables: vscode.Disposable[] = [panel]
+    let disposed: boolean = false
+
+    panel.onDidDispose(() => {
+        console.log("disposing!")
+        disposed = true
+        // Clean up our resources
+        disposables.forEach((x) => x.dispose())
+    })
+
+    /** Set the HTML content of the Webview panel. Triggers a refresh of the iframe. */
+    const set_html = (title: string, contents: string) => {
+        panel.title = title
+        panel.webview.html = contents
+    }
+
+    // Set the webview's initial html content
+    set_html("Pluto loading...", LOADING_HTML)
+
+    // Start creating a `backend`, i.e. start running the `julia-runtime/run.jl` script.
+    const backend = create_default_backend(context.extensionPath)
+
+    const notebook_id = uuid()
+    const editor_html_filename = `editor_bespoke_${notebook_id}.html`
+
+    setup_pluto_in_webview({
+        panel,
+        context,
+        pluto_asset_dir,
+        notebook_id,
+        editor_html_filename,
+        renderStatusBar: () => {}, // TODO
+        backend,
+        initialize_notebook: async (extra_details: Object) => {
+            await backend.send_command("new", {
+                editor_html_filename,
+                notebook_id,
+                frontend_params: {
+                    // disable_ui: true,
+                },
+                ...extra_details,
+            })
+        },
     })
 }
 

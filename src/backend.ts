@@ -11,7 +11,6 @@ import { EventEmitter } from "events"
 
 type BackendOpts = {
     pluto_asset_dir: string
-    vscode_proxy_root: vscode.Uri
     /** These properties correspond to keyword arguments to `Pluto.run`. e.g. `{ workspace_use_distributed: false, auto_reload_from_file: true }` */
     pluto_config?: Object
 }
@@ -19,12 +18,12 @@ type BackendOpts = {
 /** This code launches the Pluto runner (julia-runtime/run.jl) and keeps a connection with it. Communication happens over stdin/stdout, with JSON. You can use `send_command` to say something to the Pluto runner. */
 export class PlutoBackend {
     private static _instance: PlutoBackend | null = null
-    public static create_async(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
+    public static create_async(extensionPath: string, status: vscode.StatusBarItem, opts: BackendOpts) {
         if (PlutoBackend._instance) {
             return PlutoBackend._instance
         }
 
-        PlutoBackend._instance = new PlutoBackend(context, status, opts)
+        PlutoBackend._instance = new PlutoBackend(extensionPath, status, opts)
         return PlutoBackend._instance
     }
 
@@ -62,11 +61,11 @@ export class PlutoBackend {
 
     public file_events: EventEmitter
 
-    private constructor(context: vscode.ExtensionContext, status: vscode.StatusBarItem, opts: BackendOpts) {
+    private constructor(extensionPath: string, status: vscode.StatusBarItem, opts: BackendOpts) {
         this._status = status
         this._opts = opts
         console.log("Starting PlutoBackend...")
-        this.working_directory = path.join(context.extensionPath, "julia-runtime")
+        this.working_directory = path.join(extensionPath, "julia-runtime")
 
         this._status.text = "Pluto: starting..."
         this._status.show()
@@ -82,7 +81,7 @@ export class PlutoBackend {
 
         // hack to let me write async code inside the constructor
         Promise.resolve().then(async () => {
-            const args = [opts.pluto_asset_dir, String(opts.vscode_proxy_root), String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {})]
+            const args = [opts.pluto_asset_dir, String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {})]
 
             const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })

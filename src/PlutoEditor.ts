@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { PlutoBackend } from './backend';
 import { getWebviewOptions, LOADING_HTML } from './extension';
 import { create_proxy } from './ws-proxy';
+import { pluto_asset_dir, setup_pluto_in_webview } from './setup_webview';
 
 export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
@@ -16,11 +17,10 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 	}
 
 	private static readonly viewType = 'plutoView';
-	private readonly pluto_asset_dir = join(tmpdir(), uuid())
 	private readonly webviews = new WebviewCollection();
 	private readonly uri_to_notebook_id_map = new Map <vscode.Uri, string>();
 
-	private static readonly statusbar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
+	public static readonly statusbar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1)
 
 	public renderStatusBar() {
 		PlutoEditor.statusbar.text = `Pluto: ${this.webviews.notebooksRunning()} 📒`
@@ -41,7 +41,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 	): Promise<void> {
 		// Setup initial content for the webview
 		webviewPanel.webview.options =
-			getWebviewOptions(this.context.extensionUri, this.pluto_asset_dir)
+			getWebviewOptions(this.context.extensionUri, pluto_asset_dir)
 
 		const currentWebviews = Array.from(this.webviews.get(document.uri))
 		const hasMoreWebviews = currentWebviews.length !== 0
@@ -64,11 +64,12 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 			webviewPanel.title = title
 			webviewPanel.webview.html = contents
 		}
+		
+		
 
 
-		const backend = PlutoBackend.create_async(this.context, PlutoEditor.statusbar, {
-			pluto_asset_dir: this.pluto_asset_dir,
-			vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(this.pluto_asset_dir)),
+		const backend = PlutoBackend.create_async(this.context.extensionPath, PlutoEditor.statusbar, {
+			pluto_asset_dir: pluto_asset_dir,
 			pluto_config: {
 				// workspace_use_distributed: false,
 			},
@@ -206,20 +207,29 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 				backend.send_command("open", {
 					editor_html_filename,
 					notebook_id,
+					vscode_proxy_root: webviewPanel.webview.asWebviewUri(vscode.Uri.file(pluto_asset_dir)).toString(),
 					text,
 					jlfile,
 					frontend_params: {
 						// disable_ui: true,
 					},
 				})
-			const handler = setInterval(() => {
+			const interval_handler = setInterval(() => {
+				/*
+				This loop will keep checking whether the bespoke editor file has been created.
+				
+				Since generating the bespoke editor is the last thing that the Pluto runner does, this is a low-tech way to know that the runner is ready. 🌝
+				*/
 				try {
 					// console.log("checking file existence!")
-					accessSync(join(this.pluto_asset_dir, editor_html_filename))
+					accessSync(join(pluto_asset_dir, editor_html_filename))
+                	// last function call will throw if the file does not exist yet.
+					
+                	// From this point on, the bespoke editor file exists, the runner is ready, and we will continue setting up this beautiful IDE experience for our patient users.
 					// console.log("file exists!")
 
 					setTimeout(async () => {
-						const contents = readFileSync(join(this.pluto_asset_dir, editor_html_filename), {
+						const bespoke_editor_contents = readFileSync(join(pluto_asset_dir, editor_html_filename), {
 							encoding: "utf8",
 						})
 
@@ -245,19 +255,22 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 						})
 						console.log("Proxy created!")
 
+                    	// Now that the proxy is set up, we can set the HTML contents of our Webview, which will trigger it to load.
 						console.log("Loading page HTML")
-						set_html("Pluto", contents)
+						set_html("Pluto", bespoke_editor_contents)
 					}, 50)
 
-					clearInterval(handler)
+					clearInterval(interval_handler)
 				} catch (e) {
-					//
+					// TODO: check the error type and rethrow or handle correctly if it's not a file-does-not-exist-yet error?
+                	// TODO: Maybe add a timeout
 				}
 			}, 200)
 
 		})
 	}
 }
+
 
 
 class WebviewCollection {
