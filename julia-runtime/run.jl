@@ -85,9 +85,9 @@ end
 # This is the definition of Type Piracy 😇
 function Pluto.save_notebook(notebook::Pluto.Notebook)
 	oldRepr = get(extensionData.textRepresentations, notebook.path, "")
-	io = IOBuffer()
-	Pluto.save_notebook(io, notebook)
-	newRepr = String(take!(io))
+	newRepr = sprint() do io
+		Pluto.save_notebook(io, notebook)
+	end
 	if newRepr != oldRepr
 		extensionData.textRepresentations[notebook.path] = newRepr
 		whenNotebookUpdates(notebook.path, newRepr)
