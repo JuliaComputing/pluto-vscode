@@ -12,15 +12,6 @@ export const pluto_asset_dir = join(tmpdir(), uuid())
 /** A temporary directory that starts out empty. We will ask the Pluto runner to fill this directory with Pluto's frontend assets, and with 'bespoke editors'. Search for 'bespoke' to learn more! */
 console.log("pluto_asset_dir: ", pluto_asset_dir)
 
-export const get_default_backend = (extensionPath: string) => {
-    return PlutoBackend.create_async(extensionPath, PlutoEditor.statusbar, {
-        pluto_asset_dir,
-        pluto_config: {
-            // workspace_use_distributed: false,
-        },
-    })
-}
-
 export const setup_pluto_in_webview = ({
     panel,
     context,

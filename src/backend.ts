@@ -5,9 +5,18 @@ import { v4 as uuid } from "uuid"
 import portastic from "portastic"
 import _ from "lodash"
 import { decode_base64_to_string } from "./encoding"
-import { readdirSync, unlinkSync } from "fs"
-
 import { EventEmitter } from "events"
+import { get_status_bar } from "./status_bar"
+import { pluto_asset_dir } from "./setup_webview"
+
+export const get_default_backend = (extensionPath: string) => {
+    return PlutoBackend.create_async(extensionPath, {
+        pluto_asset_dir,
+        pluto_config: {
+            // workspace_use_distributed: false,
+        },
+    })
+}
 
 type BackendOpts = {
     pluto_asset_dir: string
@@ -18,12 +27,12 @@ type BackendOpts = {
 /** This code launches the Pluto runner (julia-runtime/run.jl) and keeps a connection with it. Communication happens over stdin/stdout, with JSON. You can use `send_command` to say something to the Pluto runner. */
 export class PlutoBackend {
     private static _instance: PlutoBackend | null = null
-    public static create_async(extensionPath: string, status: vscode.StatusBarItem, opts: BackendOpts) {
+    public static create_async(extensionPath: string, opts: BackendOpts) {
         if (PlutoBackend._instance) {
             return PlutoBackend._instance
         }
 
-        PlutoBackend._instance = new PlutoBackend(extensionPath, status, opts)
+        PlutoBackend._instance = new PlutoBackend(extensionPath, opts)
         return PlutoBackend._instance
     }
 
@@ -61,8 +70,8 @@ export class PlutoBackend {
 
     public file_events: EventEmitter
 
-    private constructor(extensionPath: string, status: vscode.StatusBarItem, opts: BackendOpts) {
-        this._status = status
+    private constructor(extensionPath: string, opts: BackendOpts) {
+        this._status = get_status_bar()
         this._opts = opts
         console.log("Starting PlutoBackend...")
         this.working_directory = path.join(extensionPath, "julia-runtime")
