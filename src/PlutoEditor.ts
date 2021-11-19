@@ -106,8 +106,8 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 					// Trigger saving the document in VS Code
 					if(!edit_failed) {
 						try {
-							console.log("triggering file save without formatting")
-							await vscode.commands.executeCommand("workbench.action.files.saveWithoutFormatting")
+							// console.log("triggering file save without formatting")
+							// await vscode.commands.executeCommand("workbench.action.files.saveWithoutFormatting")
 						} catch (e) {
 							console.log("Failed to trigger file save...", e)
 						}
