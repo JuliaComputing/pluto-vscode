@@ -1,6 +1,7 @@
 import * as vscode from "vscode"
 import { PlutoBackend } from "./backend"
 import { PlutoEditor } from "./PlutoEditor"
+import { start_empty_notebook_app, start_notebook_file_app } from "./app_engine"
 import { TextDecoder, TextEncoder } from "util"
 import { v4 as uuid } from "uuid"
 
@@ -70,6 +71,39 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.commands.executeCommand("vscode.openWith", selectedDocumentURI, "plutoEditor")
         })
     )
+    context.subscriptions.push(
+        vscode.commands.registerCommand("plutoAppEngine.newNotebook", () => {
+            start_empty_notebook_app(context)
+        })
+    )
+    context.subscriptions.push(
+        vscode.commands.registerCommand("plutoAppEngine.openNotebook", async (documentURI, isolated_cell_ids = undefined) => {
+            start_notebook_file_app(context, {
+                notebook_file_contents: new TextDecoder().decode(await vscode.workspace.fs.readFile(documentURI)),
+                isolated_cell_ids: isolated_cell_ids,
+            })
+        })
+    )
+
+    /** This will be available as our `.exports` when this extension is used by another extension, see https://code.visualstudio.com/api/references/vscode-api#extensions. */
+    const api = {
+        version: 1,
+        runNotebookApp: (args: { notebook_file_contents: string; isolated_cell_ids?: string[]; disable_ui?: boolean; [_ignored: string]: any }) =>
+            start_notebook_file_app(context, args),
+    }
+
+    // let cool_nb =
+    //     '### A Pluto.jl notebook ###\n# v0.17.1\n\nusing Markdown\nusing InteractiveUtils\n\n# ╔═╡ 3d0fb1de-8e96-4eed-8563-c91de4786001\n"show me!!!"\n\n# ╔═╡ 3d0fb1de-8e96-4eed-8563-c91de4786002\ndont\' show me\n\n# ╔═╡ Cell order:\n# ╠═3d0fb1de-8e96-4eed-8563-c91de4786001\n# ╠═3d0fb1de-8e96-4eed-8563-c91de4786002'
+
+    // let cool_nb_cell_id = "3d0fb1de-8e96-4eed-8563-c91de4786001"
+
+    // api.runNotebookApp({
+    //     notebook_file_contents: cool_nb,
+    //     isolated_cell_ids: [cool_nb_cell_id],
+    //     disable_ui: true,
+    // })
+
+    return api
 }
 
 export const LOADING_HTML = `<!DOCTYPE html>

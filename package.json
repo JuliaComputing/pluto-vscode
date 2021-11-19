@@ -32,6 +32,16 @@
                 "command": "plutoEditor.openCurrentWith",
                 "title": "Open with Pluto.jl 🎈",
                 "category": "Pluto"
+            },
+            {
+                "command": "plutoAppEngine.newNotebook",
+                "title": "Pluto.jl app engine: empty notebook",
+                "category": "Pluto"
+            },
+            {
+                "command": "plutoAppEngine.openCurrentWith",
+                "title": "Pluto.jl app engine: open file as app",
+                "category": "Pluto"
             }
         ],
         "customEditors": [
