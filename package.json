@@ -1,7 +1,7 @@
 {
     "name": "pluto-vscode",
     "description": "Pluto inside VS Code",
-    "version": "0.0.1",
+    "version": "0.1.0",
     "publisher": "juliacomputing",
     "license": "MIT",
     "repository": {
@@ -15,38 +15,55 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:plutoEditor.start",
-        "onCommand:plutoEditor.openCurrentWith",
-        "onWebviewPanel:plutoEditor",
-        "onCustomEditor:plutoEditor"
+        "onCommand:pluto.editor.start",
+        "onCommand:pluto.editor.openCurrentWith",
+        "onWebviewPanel:pluto.editor",
+        "onCustomEditor:pluto.editor"
     ],
     "main": "./out/extension.js",
     "contributes": {
+        "configuration": {
+            "title": "Pluto.jl",
+            "properties": {
+                "pluto.plutoBranch": {
+                    "type": "string",
+                    "title": "Custom Pluto branch name",
+                    "default": "",
+                    "markdownDescription": "**Advanced:** if you want to run a custom version of Pluto, enter the branch name, tag name or commit hash here. \n\nLeave empty for the default. *Restart VS Code for changes to take effect.*"
+                },
+                "pluto.plutoRepositoryUrl": {
+                    "type": "string",
+                    "title": "Custom Pluto fork URL",
+                    "default": "",
+                    "markdownDescription": "**Advanced:** if you want to run a custom fork of Pluto, enter the repository url here. \n\nLeave empty for the default. *Restart VS Code for changes to take effect.*"
+                }
+            }
+        },
         "commands": [
             {
-                "command": "plutoEditor.start",
+                "command": "pluto.editor.start",
                 "title": "Start a Pluto.jl notebook 🎈",
                 "category": "Pluto"
             },
             {
-                "command": "plutoEditor.openCurrentWith",
+                "command": "pluto.editor.openCurrentWith",
                 "title": "Open with Pluto.jl 🎈",
                 "category": "Pluto"
             },
             {
-                "command": "plutoAppEngine.newNotebook",
+                "command": "pluto.appEngine.newNotebook",
                 "title": "Pluto.jl app engine: empty notebook",
                 "category": "Pluto"
             },
             {
-                "command": "plutoAppEngine.openCurrentWith",
+                "command": "pluto.appEngine.openCurrentWith",
                 "title": "Pluto.jl app engine: open file as app",
                 "category": "Pluto"
             }
         ],
         "customEditors": [
             {
-                "viewType": "plutoEditor",
+                "viewType": "pluto.editor",
                 "displayName": "Pluto",
                 "selector": [
                     {
@@ -63,14 +80,14 @@
             "editor/title/context": [
                 {
                     "when": "resourceLangId == julia",
-                    "command": "plutoEditor.openCurrentWith",
+                    "command": "pluto.editor.openCurrentWith",
                     "group": "3_open@3"
                 }
             ],
             "explorer/context": [
                 {
                     "when": "resourceLangId == julia",
-                    "command": "plutoEditor.openCurrentWith",
+                    "command": "pluto.editor.openCurrentWith",
                     "group": "navigation@4"
                 }
             ]

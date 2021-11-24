@@ -8,6 +8,7 @@ import { decode_base64_to_string } from "./encoding"
 import { EventEmitter } from "events"
 import { get_status_bar } from "./status_bar"
 import { pluto_asset_dir } from "./setup_webview"
+import { PLUTO_BRANCH_NAME } from "./extension"
 
 export const get_default_backend = (extensionPath: string) => {
     return PlutoBackend.create_async(extensionPath, {
@@ -90,11 +91,18 @@ export class PlutoBackend {
 
         // hack to let me write async code inside the constructor
         Promise.resolve().then(async () => {
-            const args = [opts.pluto_asset_dir, String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {})]
+            let conf = vscode.workspace.getConfiguration()
+            // console.log(conf)
+            let r = (a: any, b: any) => (a ? a : b)
+
+            let branch = r(conf.get("pluto.plutoBranch"), PLUTO_BRANCH_NAME)
+            let repo_url = r(conf.get("pluto.plutoRepositoryUrl"), "")
+
+            const args = [opts.pluto_asset_dir, String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {}), String(branch), String(repo_url)]
 
             const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })
-            this._process = cp.spawn(julia_cmd, ["--project=.", "run.jl", ...args], {
+            this._process = cp.spawn(julia_cmd, ["run.jl", ...args], {
                 cwd: this.working_directory,
             })
 
