@@ -11,7 +11,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
         return providerRegistration
     }
 
-    private static readonly viewType = "plutoEditor"
+    private static readonly viewType = "pluto.editor"
     private readonly webviews = new WebviewCollection()
     private readonly uri_to_notebook_id_map = new Map<vscode.Uri, string>()
 

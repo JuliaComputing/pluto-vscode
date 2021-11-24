@@ -5,6 +5,9 @@ import { start_empty_notebook_app, start_notebook_file_app } from "./app_engine"
 import { TextDecoder, TextEncoder } from "util"
 import { v4 as uuid } from "uuid"
 
+// this is a commit on the vscode-webview-proxy branch, see https://github.com/fonsp/Pluto.jl/pull/1493
+export const PLUTO_BRANCH_NAME = "7efb1b692eb488b5c295a368d9c3a96458c8b6de"
+
 /*
 HELLO
 
@@ -15,7 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
     console.log("Activating extension pluto-vscode")
     context.subscriptions.push(PlutoEditor.register(context))
     context.subscriptions.push(
-        vscode.commands.registerCommand("plutoEditor.start", () => {
+        vscode.commands.registerCommand("pluto.editor.start", () => {
             // THE ONLY WAY I WAS ABLE TO DO THIS IS
             // ask the user for the file name IN ADVANCE, then write an empty notebook there, then open it
             // ugh
@@ -31,7 +34,7 @@ export function activate(context: vscode.ExtensionContext) {
                     // let path = path ?? vscode.Uri.parse("untitled:untitled-1.jl")
                     if (path) {
                         await vscode.workspace.fs.writeFile(path, new TextEncoder().encode(empty_notebook_contents()))
-                        vscode.commands.executeCommand("vscode.openWith", path, "plutoEditor")
+                        vscode.commands.executeCommand("vscode.openWith", path, "pluto.editor")
                     }
                 })
 
@@ -40,7 +43,7 @@ export function activate(context: vscode.ExtensionContext) {
             // THIS ONE almost works, but when you do the first Ctrl+S, it does not automatically add the .jl extension
             // const filename = vscode.Uri.parse("untitled:untitled-1.jl")
             // vscode.workspace.fs.writeFile(filename, new TextEncoder().encode(empty_notebook_contents())).then(() => {
-            // vscode.commands.executeCommand("vscode.openWith", filename, "plutoEditor")
+            // vscode.commands.executeCommand("vscode.openWith", filename, "pluto.editor")
             // })
 
             // ALSO CLOSE and the most official, but it opens the window twice, once in Pluto, once in a text editor.
@@ -52,7 +55,7 @@ export function activate(context: vscode.ExtensionContext) {
             //     .then(async (document) => {
             //         const to_close = vscode.workspace.textDocuments.filter((d) => d === document)
 
-            //         await vscode.commands.executeCommand("vscode.openWith", document.uri, "plutoEditor")
+            //         await vscode.commands.executeCommand("vscode.openWith", document.uri, "pluto.editor")
             //         // vs code already opens a regular .jl text editor, we should manually close that...
             //         // TODO: this gives a ...are you sure... popup :(((
             //         for (const doc of to_close) {
@@ -67,17 +70,17 @@ export function activate(context: vscode.ExtensionContext) {
         })
     )
     context.subscriptions.push(
-        vscode.commands.registerCommand("plutoEditor.openCurrentWith", (selectedDocumentURI) => {
-            vscode.commands.executeCommand("vscode.openWith", selectedDocumentURI, "plutoEditor")
+        vscode.commands.registerCommand("pluto.editor.openCurrentWith", (selectedDocumentURI) => {
+            vscode.commands.executeCommand("vscode.openWith", selectedDocumentURI, "pluto.editor")
         })
     )
     context.subscriptions.push(
-        vscode.commands.registerCommand("plutoAppEngine.newNotebook", () => {
+        vscode.commands.registerCommand("pluto.appEngine.newNotebook", () => {
             start_empty_notebook_app(context)
         })
     )
     context.subscriptions.push(
-        vscode.commands.registerCommand("plutoAppEngine.openNotebook", async (documentURI, isolated_cell_ids = undefined) => {
+        vscode.commands.registerCommand("pluto.appEngine.openNotebook", async (documentURI, isolated_cell_ids = undefined) => {
             start_notebook_file_app(context, {
                 notebook_file_contents: new TextDecoder().decode(await vscode.workspace.fs.readFile(documentURI)),
                 isolated_cell_ids: isolated_cell_ids,

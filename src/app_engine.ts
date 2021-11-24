@@ -4,7 +4,7 @@ import { setup_pluto_in_webview, getWebviewOptions } from "./setup_webview"
 import { get_default_backend } from "./backend"
 import { LOADING_HTML, empty_notebook_contents } from "./extension"
 
-const viewType = "plutoEditor"
+const viewType = "pluto.editor"
 
 export const start_empty_notebook_app = (context: vscode.ExtensionContext, args: { disable_ui?: boolean } = {}) => {
     return start_notebook_file_app(context, {
