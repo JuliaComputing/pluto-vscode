@@ -1,9 +1,11 @@
 {
     "name": "pluto-vscode",
-    "description": "Pluto inside VS Code",
+    "displayName": "Pluto.jl (alpha preview)",
+    "description": "Pluto.jl inside VS Code",
     "version": "0.1.0",
     "publisher": "juliacomputing",
     "license": "MIT",
+    "icon": "media/favicon_unsaturated_bg_512.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/JuliaComputing/pluto-vscode"
