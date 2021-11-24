@@ -27,7 +27,7 @@ If you are **developing** this extension:
 4. Go to Run > Start Debugging (`F5`)
 
 If you just want to **run** the extension:
-1. Download the `.vsix` file from the repository.
+1. Download the `.vsix` file from our [releases](https://github.com/JuliaComputing/pluto-vscode/releases).
 1. Launch VS Code
 1. `Cmd+Shift+P` and run `Extensions: Install from VSIX...`, select the VSIX file
 
