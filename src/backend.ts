@@ -143,24 +143,8 @@ export class PlutoBackend {
             server.listen(await this.localport);
             this._process.stderr!.on("data", (data) => {
                 const text = data.slice(0, data.length - 1)
-                // TODO: Generalize this for more message types to be added
-                if (text.includes("Command: [[Notebook=")) {
-                    const jlfile = data
-                        .slice(data.indexOf("=") + 1, data.indexOf("]]"))
-                        .toString()
-                        .trim()
-                    console.log("jlfile", jlfile)
-                    const dataString = data.toString()
-                    const notebookString = dataString.substr(dataString.indexOf("## ") + 3).trim()
-                    const decoded = decode_base64_to_string(notebookString)
-                    console.log("Notebook updated!", decoded.substring(0, 100))
-                    // Let listeners know the file changed
-                    this.file_events.emit("change", jlfile, decoded)
-                    return
-                }
 
                 console.log(`📈${text}`)
-
                 // @info prints to stderr
                 if (text.includes("READY FOR COMMANDS")) {
                     resolve_ready(true)
