@@ -71,12 +71,16 @@ function getNextSTDINCommand()
     JSON.parse(new_command_str)
 end
 
+function send(payload::String)
+    HTTP.post("http://localhost:$extension_port", body=payload)
+end
+
 function sendCommand(name::String, payload::String)
     io = IOBuffer()
     io64 = Base64EncodePipe(io)
     print(io64, payload)
     close(io64)
-    HTTP.post("http://localhost:$extension_port", body="Command: [[Notebook=$(name)]] ## $(String(take!(io))) ###")
+    send("Command: [[Notebook=$(name)]] ## $(String(take!(io))) ###")
 end
 
 # This is the definition of type piracy
@@ -112,19 +116,6 @@ extensionData = PlutoExtensionSessionData(
 function whenNotebookUpdates(jlfile, newString)
     filename = splitpath(jlfile)[end]
     sendCommand(filename, newString)
-end
-
-# Move this in Pluto, probably as a hook
-# This is the definition of Type Piracy 😇
-function Pluto.save_notebook(notebook::Pluto.Notebook)
-    oldRepr = get(extensionData.textRepresentations, notebook.path, "")
-    newRepr = sprint() do io
-        Pluto.save_notebook(io, notebook)
-    end
-    if newRepr != oldRepr
-        extensionData.textRepresentations[notebook.path] = newRepr
-        whenNotebookUpdates(notebook.path, newRepr)
-    end
 end
 
 ###
@@ -177,6 +168,16 @@ try ## Note: This is to assist with co-developing Pluto & this Extension
 catch
 end
 
+function registerOnFileSaveListener(notebook::Pluto.notebook)
+    function onfilechange(pe::Pluto.PlutoEvent)
+        if pe isa Pluto.FileSaveEvent
+            whenNotebookUpdates(pe.path, pe.fileContent)
+        end
+    end
+    notebook.write_out_fs = false
+    notebook.listeners = [onfilechange, notebook.listeners...]
+end
+
 command_task = Pluto.@asynclog while true
     filenbmap = extensionData.notebooks
     new_command = getNextSTDINCommand()
@@ -206,6 +207,9 @@ command_task = Pluto.@asynclog while true
             write(f, detail["text"])
         end
         nb = Pluto.SessionActions.open(pluto_server_session, jlpath; notebook_id = UUID(detail["notebook_id"]))
+
+        registerOnFileSaveListener(nb)
+
         filenbmap[detail["jlfile"]] = nb
         generate_output(nb, editor_html_filename, vscode_proxy_root, frontend_params)
 

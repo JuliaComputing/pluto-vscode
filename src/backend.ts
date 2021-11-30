@@ -62,6 +62,7 @@ export class PlutoBackend {
 
     private _status: vscode.StatusBarItem
     private _process?: cp.ChildProcess
+    private _server?: http.Server
     private _opts?: BackendOpts
     public working_directory: string
 
@@ -83,8 +84,8 @@ export class PlutoBackend {
         this._status.show()
         this.secret = uuid()
         // find a free port, some random sampling to make collisions less likely
-        this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23047)
-        this.localport = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23048)
+        this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23050)
+        this.localport = portastic.find({ min: 22000, retrieve: 10 }).then((r) => _.sample(r) ?? 23051)
         let resolve_ready = (x: boolean) => { }
         this.ready = new Promise<boolean>((r) => {
             resolve_ready = r
@@ -120,27 +121,33 @@ export class PlutoBackend {
                         .slice(data.indexOf("=") + 1, data.indexOf("]]"))
                         .toString()
                         .trim()
-                    console.log("jlfile", jlfile)
                     const dataString = data.toString()
                     const notebookString = dataString.substr(dataString.indexOf("## ") + 3).trim()
                     const decoded = decode_base64_to_string(notebookString)
-                    console.log("Notebook updated!", decoded.substring(0, 100))
                     // Let listeners know the file changed
                     this.file_events.emit("change", jlfile, decoded)
+                } else {
+                    console.log(data)
                 }
             }
-            const server = http.createServer((req, res) => {
+            this._server = http.createServer((req, res) => {
                 let data = '';
                 req.on('data', chunk => {
                     data += chunk;
                 })
                 req.on('end', () => {
                     messageHandler(data)
-                    console.log("Got a message, ", data)
                     res.end();
                 })
             })
-            server.listen(await this.localport);
+            this._server.listen(await this.localport);
+
+            this._process.stdout!.on("data", (data) => {
+                const text = data.slice(0, data.length - 1)
+
+                console.log(`📈${text}`)
+            })
+
             this._process.stderr!.on("data", (data) => {
                 const text = data.slice(0, data.length - 1)
 
@@ -159,7 +166,7 @@ export class PlutoBackend {
         this._status.hide()
         this._process?.kill()
         PlutoBackend._instance = null
-
+        this._server?.close?.()
         this._status.text = "Pluto: killing..."
         this._status.show()
     }

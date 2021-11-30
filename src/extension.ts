@@ -6,7 +6,7 @@ import { TextDecoder, TextEncoder } from "util"
 import { v4 as uuid } from "uuid"
 
 // this is a commit on the vscode-webview-proxy branch, see https://github.com/fonsp/Pluto.jl/pull/1493
-export const PLUTO_BRANCH_NAME = "7efb1b692eb488b5c295a368d9c3a96458c8b6de"
+export const PLUTO_BRANCH_NAME = "091769c3df1d1c29bb1d640b62bb18cfc183a78d"
 
 /*
 HELLO
@@ -91,7 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
     /** This will be available as our `.exports` when this extension is used by another extension, see https://code.visualstudio.com/api/references/vscode-api#extensions. */
     const api = {
         version: 1,
-        runNotebookApp: (args: { notebook_file_contents: string; isolated_cell_ids?: string[]; disable_ui?: boolean; [_ignored: string]: any }) =>
+        runNotebookApp: (args: { notebook_file_contents: string; isolated_cell_ids?: string[]; disable_ui?: boolean;[_ignored: string]: any }) =>
             start_notebook_file_app(context, args),
     }
 
