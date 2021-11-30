@@ -21,7 +21,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
         statusbar.show()
     }
 
-    constructor(private readonly context: vscode.ExtensionContext) {}
+    constructor(private readonly context: vscode.ExtensionContext) { }
 
     /**
      * Called when our custom editor is opened.
@@ -41,6 +41,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
 
         const editor_html_filename = `editor_bespoke_${notebook_id}.html`
         const jlfile = `editor_bespoke_${notebook_id}.jl`
+        const fsPath = document.uri.fsPath
 
         this.webviews.add(document, notebook_id, panel)
 
@@ -103,7 +104,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
             console.log("didsave", panel.active)
             if (doc.uri.toString() === document.uri.toString()) {
                 // When VSCode updates the document, notify pluto from here
-                backend.send_command("update", { jlfile, text: doc.getText() })
+                backend.send_command("update", { jlfile })
             }
             this.renderStatusBar()
         }, disposables)
@@ -188,6 +189,7 @@ export class PlutoEditor implements vscode.CustomTextEditorProvider {
                         notebook_id,
                         text,
                         jlfile,
+                        fsPath,
                         frontend_params: {
                             // disable_ui: true,
                         },

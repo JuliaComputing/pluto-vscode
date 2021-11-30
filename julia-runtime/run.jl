@@ -98,7 +98,7 @@ pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
     launch_browser = false,
     # show_file_system=false,
     dismiss_update_notification = true,
-    auto_reload_from_file = true,
+    auto_reload_from_file = false,
     (Symbol(k) => v for (k, v) in JSON.parse(pluto_launch_params))...)
 pluto_server_session = Pluto.ServerSession(;
     secret = secret,
@@ -113,9 +113,9 @@ extensionData = PlutoExtensionSessionData(
     joinpath(asset_output_dir, "jlfiles/")
 )
 
-function whenNotebookUpdates(jlfile, newString)
-    filename = splitpath(jlfile)[end]
-    sendCommand(filename, newString)
+function whenNotebookUpdates(path, newString)
+    write(path, newString)
+    sendCommand(path, newString)
 end
 
 ###
@@ -168,7 +168,7 @@ try ## Note: This is to assist with co-developing Pluto & this Extension
 catch
 end
 
-function registerOnFileSaveListener(notebook::Pluto.notebook)
+function registerOnFileSaveListener(notebook::Pluto.Notebook)
     function onfilechange(pe::Pluto.PlutoEvent)
         if pe isa Pluto.FileSaveEvent
             whenNotebookUpdates(pe.path, pe.fileContent)
@@ -200,28 +200,15 @@ command_task = Pluto.@asynclog while true
         end
         frontend_params = get(detail, "frontend_params", Dict())
 
-
-        jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
-        extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
-        open(jlpath, "w") do f
-            write(f, detail["text"])
-        end
+        jlpath = detail["fsPath"]  # joinpath(extensionData.jlfilesroot, detail["jlfile"])
         nb = Pluto.SessionActions.open(pluto_server_session, jlpath; notebook_id = UUID(detail["notebook_id"]))
-
         registerOnFileSaveListener(nb)
-
         filenbmap[detail["jlfile"]] = nb
         generate_output(nb, editor_html_filename, vscode_proxy_root, frontend_params)
 
     elseif type == "update"
         nb = filenbmap[detail["jlfile"]]
-        jlpath = joinpath(extensionData.jlfilesroot, detail["jlfile"])
-        open(jlpath, "w") do f
-            write(f, detail["text"])
-        end
         Pluto.update_from_file(pluto_server_session, nb)
-        extensionData.textRepresentations[detail["jlfile"]] = detail["text"]
-
     elseif type == "shutdown"
         nb = get(filenbmap, detail["jlfile"], nothing)
         !isnothing(nb) && Pluto.SessionActions.shutdown(
