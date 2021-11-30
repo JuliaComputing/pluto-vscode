@@ -1,9 +1,9 @@
 ####
 @info "COMMAND LINE ARGUMENTS"
 
-asset_output_dir, port_str, secret, pluto_launch_params, custom_pluto_branch, custom_pluto_url = if isempty(ARGS)
+asset_output_dir, port_str, secret, pluto_launch_params, custom_pluto_branch, custom_pluto_url, extension_port = if isempty(ARGS)
     @error "No arguments given, using development defaults!"
-    mktempdir(cleanup = false), "", "4653", "asdf", "{}", "", "vscode-webview-proxy"
+    mktempdir(cleanup = false), "", "4653", "asdf", "{}", "", "vscode-webview-proxy", "4654"
 else
     ARGS
 end
@@ -50,6 +50,7 @@ pluto_spec = isempty(custom_pluto_url) ?
 Pkg.add([
     Pkg.PackageSpec(name = "JSON", version = "0.21"),
     Pkg.PackageSpec(name = "Suppressor", version = "0.2"),
+    Pkg.PackageSpec(name = "HTTP", version = "0.9.17"),
     pluto_spec
 ])
 
@@ -60,6 +61,7 @@ using Suppressor
 using UUIDs
 
 import Pluto
+using HTTP
 
 #=  These are the function which document how we communicate, through STDIN
 # with the extension =#
@@ -69,12 +71,12 @@ function getNextSTDINCommand()
     JSON.parse(new_command_str)
 end
 
-function sendSTDERRCommand(name::String, payload::String)
+function sendCommand(name::String, payload::String)
     io = IOBuffer()
     io64 = Base64EncodePipe(io)
     print(io64, payload)
     close(io64)
-    @info "Command: [[Notebook=$(name)]] ## $(String(take!(io))) ###"
+    HTTP.post("http://localhost:$extension_port", body="Command: [[Notebook=$(name)]] ## $(String(take!(io))) ###")
 end
 
 # This is the definition of type piracy
@@ -109,9 +111,10 @@ extensionData = PlutoExtensionSessionData(
 
 function whenNotebookUpdates(jlfile, newString)
     filename = splitpath(jlfile)[end]
-    sendSTDERRCommand(filename, newString)
+    sendCommand(filename, newString)
 end
 
+# Move this in Pluto, probably as a hook
 # This is the definition of Type Piracy 😇
 function Pluto.save_notebook(notebook::Pluto.Notebook)
     oldRepr = get(extensionData.textRepresentations, notebook.path, "")
