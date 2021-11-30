@@ -1,4 +1,5 @@
 import * as vscode from "vscode"
+import * as http from "http"
 import * as cp from "child_process"
 import * as path from "path"
 import { v4 as uuid } from "uuid"
@@ -61,10 +62,12 @@ export class PlutoBackend {
 
     private _status: vscode.StatusBarItem
     private _process?: cp.ChildProcess
+    private _server?: http.Server
     private _opts?: BackendOpts
     public working_directory: string
 
     public port: Promise<number>
+    public localport: Promise<number>
     public secret: string
 
     public ready: Promise<boolean>
@@ -81,9 +84,9 @@ export class PlutoBackend {
         this._status.show()
         this.secret = uuid()
         // find a free port, some random sampling to make collisions less likely
-        this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23047)
-
-        let resolve_ready = (x: boolean) => {}
+        this.port = portastic.find({ min: 9000, retrieve: 10 }).then((r) => _.sample(r) ?? 23050)
+        this.localport = portastic.find({ min: 22000, retrieve: 10 }).then((r) => _.sample(r) ?? 23051)
+        let resolve_ready = (x: boolean) => { }
         this.ready = new Promise<boolean>((r) => {
             resolve_ready = r
         })
@@ -98,7 +101,7 @@ export class PlutoBackend {
             let branch = r(conf.get("pluto.plutoBranch"), PLUTO_BRANCH_NAME)
             let repo_url = r(conf.get("pluto.plutoRepositoryUrl"), "")
 
-            const args = [opts.pluto_asset_dir, String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {}), String(branch), String(repo_url)]
+            const args = [opts.pluto_asset_dir, String(await this.port), this.secret, JSON.stringify(opts.pluto_config ?? {}), String(branch), String(repo_url), String(await (this.localport))]
 
             const julia_cmd = await get_julia_command()
             console.log({ julia_cmd })
@@ -111,30 +114,44 @@ export class PlutoBackend {
                 this._status.text = "Pluto: stopped"
                 this._status.show()
             })
-            this._process.stdout!.on("data", (data) => {
-                console.log(`📄${data.slice(0, data.length - 1)}`)
-                console.log(JSON.parse(data.slice(0, data.length - 1)))
-            })
-            this._process.stderr!.on("data", (data) => {
-                const text = data.slice(0, data.length - 1)
-                // TODO: Generalize this for more message types to be added
-                if (text.includes("Command: [[Notebook=")) {
+
+            const messageHandler = (data: String) => {
+                if (data.includes("Command: [[Notebook=")) {
                     const jlfile = data
                         .slice(data.indexOf("=") + 1, data.indexOf("]]"))
                         .toString()
                         .trim()
-                    console.log("jlfile", jlfile)
                     const dataString = data.toString()
                     const notebookString = dataString.substr(dataString.indexOf("## ") + 3).trim()
                     const decoded = decode_base64_to_string(notebookString)
-                    console.log("Notebook updated!", decoded.substring(0, 100))
                     // Let listeners know the file changed
                     this.file_events.emit("change", jlfile, decoded)
-                    return
+                } else {
+                    console.log(data)
                 }
+            }
+            this._server = http.createServer((req, res) => {
+                let data = '';
+                req.on('data', chunk => {
+                    data += chunk;
+                })
+                req.on('end', () => {
+                    messageHandler(data)
+                    res.end();
+                })
+            })
+            this._server.listen(await this.localport);
+
+            this._process.stdout!.on("data", (data) => {
+                const text = data.slice(0, data.length - 1)
 
                 console.log(`📈${text}`)
+            })
 
+            this._process.stderr!.on("data", (data) => {
+                const text = data.slice(0, data.length - 1)
+
+                console.log(`📈${text}`)
                 // @info prints to stderr
                 if (text.includes("READY FOR COMMANDS")) {
                     resolve_ready(true)
@@ -149,7 +166,7 @@ export class PlutoBackend {
         this._status.hide()
         this._process?.kill()
         PlutoBackend._instance = null
-
+        this._server?.close?.()
         this._status.text = "Pluto: killing..."
         this._status.show()
     }
