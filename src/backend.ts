@@ -143,13 +143,13 @@ export class PlutoBackend {
             this._server.listen(await this.localport);
 
             this._process.stdout!.on("data", (data) => {
-                const text = data.slice(0, data.length - 1)
+                const text = data.slice(0)
 
                 console.log(`📈${text}`)
             })
 
             this._process.stderr!.on("data", (data) => {
-                const text = data.slice(0, data.length - 1)
+                const text = data.slice(0)
 
                 console.log(`📈${text}`)
                 // @info prints to stderr
