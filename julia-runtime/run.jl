@@ -128,9 +128,9 @@ function event_listener(pe::Pluto.FileSaveEvent)
     @info "Overriden filesave event for" pe.path
     id = string(pe.notebook.notebook_id)
     oldContent = get(extensionData.textRepresentations, id, "")
-    if oldContent != pe.fileContent
-        whenNotebookUpdates(pe.path, pe.fileContent)
-        extensionData.textRepresentations[id] = pe.fileContent
+    if oldContent != pe.file_contents
+        whenNotebookUpdates(pe.path, pe.file_contents)
+        extensionData.textRepresentations[id] = pe.file_contents
     end
 end
 
@@ -138,9 +138,9 @@ end
 #     @info "Overriden filesave event for" pe.path
 #     id = string(pe.notebook.notebook_id)
 #     oldContent = get(extensionData.textRepresentations, id, "")
-#     if oldContent != pe.fileContent
-#         whenNotebookUpdates(pe.path, pe.fileContent)
-#         extensionData.textRepresentations[id] = pe.fileContent
+#     if oldContent != pe.file_contents
+#         whenNotebookUpdates(pe.path, pe.file_contents)
+#         extensionData.textRepresentations[id] = pe.file_contents
 #     end
 # end
 
