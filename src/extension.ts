@@ -6,7 +6,7 @@ import { TextDecoder, TextEncoder } from "util"
 import { v4 as uuid } from "uuid"
 
 // this is a commit on the vscode-webview-proxy branch, see https://github.com/fonsp/Pluto.jl/pull/1493
-export const PLUTO_BRANCH_NAME = "b1ada028a0c8a66de2cab211052681e05ed31203"
+export const PLUTO_BRANCH_NAME = "7f00dfd13ab19204fafa0a58d20c1808d0284d38"
 
 /*
 HELLO
