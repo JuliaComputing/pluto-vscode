@@ -134,6 +134,16 @@ function event_listener(pe::Pluto.FileSaveEvent)
     end
 end
 
+# function event_listener(pe::Pluto.FileLocalChangeEvent)
+#     @info "Overriden filesave event for" pe.path
+#     id = string(pe.notebook.notebook_id)
+#     oldContent = get(extensionData.textRepresentations, id, "")
+#     if oldContent != pe.fileContent
+#         whenNotebookUpdates(pe.path, pe.fileContent)
+#         extensionData.textRepresentations[id] = pe.fileContent
+#     end
+# end
+
 extensionData.session.event_listener =  event_listener
 ###
 @info "OPEN NOTEBOOK"
