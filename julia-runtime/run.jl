@@ -99,10 +99,12 @@ pluto_server_options = Pluto.Configuration.from_flat_kwargs(;
     # show_file_system=false,
     dismiss_update_notification = true,
     auto_reload_from_file = false,
+    disable_writing_notebook_files = true,
     (Symbol(k) => v for (k, v) in JSON.parse(pluto_launch_params))...)
+
 pluto_server_session = Pluto.ServerSession(;
     secret = secret,
-    options = pluto_server_options
+    options = pluto_server_options,
 )
 
 extensionData = PlutoExtensionSessionData(
@@ -118,6 +120,31 @@ function whenNotebookUpdates(path, newString)
     sendCommand(path, newString)
 end
 
+function event_listener(pe::Pluto.PlutoEvent)
+    @info "Overriden PlutoEvent for"  pe.path
+end
+
+function event_listener(pe::Pluto.FileSaveEvent)
+    @info "Overriden filesave event for" pe.path
+    id = string(pe.notebook.notebook_id)
+    oldContent = get(extensionData.textRepresentations, id, "")
+    if oldContent != pe.file_contents
+        whenNotebookUpdates(pe.path, pe.file_contents)
+        extensionData.textRepresentations[id] = pe.file_contents
+    end
+end
+
+# function event_listener(pe::Pluto.FileLocalChangeEvent)
+#     @info "Overriden filesave event for" pe.path
+#     id = string(pe.notebook.notebook_id)
+#     oldContent = get(extensionData.textRepresentations, id, "")
+#     if oldContent != pe.file_contents
+#         whenNotebookUpdates(pe.path, pe.file_contents)
+#         extensionData.textRepresentations[id] = pe.file_contents
+#     end
+# end
+
+extensionData.session.event_listener =  event_listener
 ###
 @info "OPEN NOTEBOOK"
 
@@ -168,16 +195,6 @@ try ## Note: This is to assist with co-developing Pluto & this Extension
 catch
 end
 
-function registerOnFileSaveListener(notebook::Pluto.Notebook)
-    function onfilechange(pe::Pluto.PlutoEvent)
-        if pe isa Pluto.FileSaveEvent
-            whenNotebookUpdates(pe.path, pe.fileContent)
-        end
-    end
-    notebook.write_out_fs = false
-    notebook.listeners = [onfilechange, notebook.listeners...]
-end
-
 command_task = Pluto.@asynclog while true
     filenbmap = extensionData.notebooks
     new_command = getNextSTDINCommand()
@@ -202,7 +219,6 @@ command_task = Pluto.@asynclog while true
 
         jlpath = detail["fsPath"]  # joinpath(extensionData.jlfilesroot, detail["jlfile"])
         nb = Pluto.SessionActions.open(pluto_server_session, jlpath; notebook_id = UUID(detail["notebook_id"]))
-        registerOnFileSaveListener(nb)
         filenbmap[detail["jlfile"]] = nb
         generate_output(nb, editor_html_filename, vscode_proxy_root, frontend_params)
 
