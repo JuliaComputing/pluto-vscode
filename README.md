@@ -1,3 +1,12 @@
+> [!IMPORTANT]  
+> Update: 2026-10-21
+> This extension is no longer maintained and unlisted from the VSCode Marketplace.
+> If you still love Pluto, you may want to check out the latest "Advanced" Pluto extension [here](https://github.com/JuliaPluto/advanced-vscode-extension).
+> It supports native VSCode notebooks and creates a bridge to AI Agents.
+> 
+> Many thanks to JuliaHub for its continued support, that enabled both this (now archived) extension, as well as the new one.
+> 
+
 # pluto-vscode
 Pluto inside a VS Code Webview, WIP. **You currently need some command line skills to be able to run this.**
 
